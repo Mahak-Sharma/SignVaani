@@ -83,5 +83,6 @@ These gloss words will be then mapped with our dataset via indexing and will be 
 ### AVATAR IMPLEMENTATION
 We implemented the 3D Avatar firstly by using the SceneKit, in the iOS framework, which is now deprecated. [You can read the Apple documentation for SceneKit here.](https://developer.apple.com/documentation/scenekit/)  
 So we switched to Vision Framework and RealityKit and did our research and implemented the 3D avatar by it.  
-Since RealityKit has 3D points for body pose only and not for hand, we had to switch again, to Three.js.  
-We are currently using three.js for the direct implementation of the 3d avatar.
+Since Vision Framework has 3D points for body pose only and not for hand, we had to switch again, to MediaPipe Holistic.
+Now when we were implemenenting with MediaPipe Holistic and RealityKit, there was compatibility issue because of coordinates, so we switched to Three.js.
+We are currently using three.js and MediaPipe Holisitc for the direct implementation of the 3d avatar.
