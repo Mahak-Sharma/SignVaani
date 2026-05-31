@@ -1,174 +1,293 @@
+//GlossProcessor.swift
 import Foundation
 import Speech
-//GlossProcessor takes speech segments → converts into gloss timeline
+import NaturalLanguage
+
 class GlossProcessor {
-    let phraseDictionary = PhraseDictionary.shared.phrases
-    //Maps phrases with gloss
-    let alphabetDictionary = AlphabetDictionary.shared.alphabet
-    // Maps Alphabets with spelling gloss
-    // these are gramatically useless in sign language
-    let numbersDictionary = NumbersDictionary.shared.numbers//to detect numbers
+
+    // Words usually removed in ISL gloss
     let ignoredWords: Set<String> = [
         "is","am","are","was","were",
         "the","a","an",
         "to","of","for",
-        "will","shall","be","been"
+        "will","shall","be","been",
+        "did","do","does"
     ]
-    private let timeWords: Set<String> = [
+
+    // Time markers
+    let timeWords: Set<String> = [
         "today", "tomorrow", "yesterday",
         "now", "later", "soon", "tonight",
         "morning", "afternoon", "evening", "night"
     ]
-    private let verbWords: Set<String> = [
-        "go", "goes", "going", "went",
-        "come", "comes", "coming", "came",
-        "eat", "eats", "eating", "ate",
-        "meet", "meets", "meeting", "met",
-        "play", "plays", "playing", "played",
-        "study", "studies", "studying", "studied",
-        "learn", "learns", "learning", "learned",
-        "read", "reads", "reading",
-        "write", "writes", "writing", "wrote",
-        "watch", "watches", "watching", "watched",
-        "speak", "speaks", "speaking", "spoke",
-        "visit", "visits", "visiting", "visited",
-        "buy", "buys", "buying", "bought"
+
+    // Question words
+    let questionWords: Set<String> = [
+        "what", "where", "when",
+        "why", "who", "how"
     ]
-    // dictionary se longest phrase length auto detect phrases ko spilt karta hai count number of words then maximum find karta hai
-    lazy var maxPhraseLength: Int = {
-        phraseDictionary.keys
-            .map { $0.split(separator: " ").count }
-            .max() ?? 1
-    }()
+
+    // Negation words
+    let negationWords: Set<String> = [
+        "not", "never", "no"
+    ]
+
+//    lazy var maxPhraseLength: Int = {
+//        phraseDictionary.keys
+//            .map { $0.split(separator: " ").count }
+//            .max() ?? 1
+//    }()
+
+    // MARK: - NLP Helpers
+
+    func isVerb(_ word: String) -> Bool {
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = word
+
+        let tag = tagger.tag(
+            at: word.startIndex,
+            unit: .word,
+            scheme: .lexicalClass
+        ).0
+
+        return tag == .verb
+    }
+
+    func lemma(for word: String) -> String {
+        let tagger = NLTagger(tagSchemes: [.lemma])
+        tagger.string = word
+
+        return tagger.tag(
+            at: word.startIndex,
+            unit: .word,
+            scheme: .lemma
+        ).0?.rawValue.lowercased() ?? word.lowercased()
+    }
+
+    // MARK: - ISL Reordering
 
     func reorderToISL(_ words: [String]) -> [String] {
-        guard words.count > 2 else { return words }
 
-        let subject = words[0]
-        let remainingWords = Array(words.dropFirst())
-
+        var subjects: [String] = []
         var objects: [String] = []
-        var times: [String] = []
         var verbs: [String] = []
+        var times: [String] = []
+        var negations: [String] = []
+        var questions: [String] = []
 
-        for word in remainingWords {
-            if timeWords.contains(word) {
-                times.append(word)
-            } else if isLikelyVerb(word) {
-                verbs.append(word)
-            } else {
-                objects.append(word)
+        for word in words {
+
+            let lower = word.lowercased()
+
+            if timeWords.contains(lower) {
+                times.append(lower)
+            }
+
+            else if questionWords.contains(lower) {
+                questions.append(lower)
+            }
+
+            else if negationWords.contains(lower) {
+                negations.append("not")
+            }
+
+            else if isVerb(lower) {
+
+                let rootVerb = lemma(for: lower)
+                verbs.append(rootVerb)
+            }
+
+            else {
+
+                // crude subject heuristic
+                if subjects.isEmpty {
+                    subjects.append(lower)
+                } else {
+                    objects.append(lower)
+                }
             }
         }
 
-        return [subject] + objects + times + verbs
+        // ISL structure:
+        // TIME + SUBJECT + OBJECT + VERB + NEGATION + QUESTION
+
+        return times
+            + subjects
+            + objects
+            + verbs
+            + negations
+            + questions
     }
 
-    private func isLikelyVerb(_ word: String) -> Bool {
-        verbWords.contains(word)
-    }
-    
-    func extractGlossTimeline(from segments: [SFTranscriptionSegment]) -> [GlossEvent] {
-        // Step 1: Flatten multi-word segments into individual words
+    // MARK: - Main Pipeline
+
+    func extractGlossTimeline(
+        from segments: [SFTranscriptionSegment]
+    ) -> [GlossEvent] {
+
         struct FlatWord {
             let word: String
             let timestamp: Double
             let duration: Double
         }
+
         var flatWords: [FlatWord] = []
+
+        // Step 1: Flatten segments
         for seg in segments {
+
             let words = seg.substring.lowercased()
                 .split(separator: " ")
                 .map { String($0) }
-            
-            if words.count == 1 {
-                flatWords.append(FlatWord(word: words[0], timestamp: seg.timestamp, duration: seg.duration))
-            } else {
-                // Distribute time evenly across words in segment
-                let timePerWord = seg.duration / Double(words.count)
-                for (i, word) in words.enumerated() {
-                    flatWords.append(FlatWord(
+
+            let timePerWord = seg.duration / Double(words.count)
+
+            for (i, word) in words.enumerated() {
+
+                flatWords.append(
+                    FlatWord(
                         word: word,
                         timestamp: seg.timestamp + Double(i) * timePerWord,
                         duration: timePerWord
-                    ))
-                }
+                    )
+                )
             }
         }
-        
-        print("Flat words:", flatWords.map { $0.word })
-        
-        // Step 2: Remove ignored words before reordering.
-        let words = flatWords.map { $0.word }
-        let filteredWords = words.filter { !ignoredWords.contains($0) }
 
-        // Step 3: Reorder into a simple ISL-friendly SOV shape.
-        let reorderedWords = reorderToISL(filteredWords)
-        let reorderedTimestamp = flatWords.last.map { $0.timestamp + $0.duration } ?? 0
-        let reorderedFlatWords = reorderedWords.map {
-            FlatWord(word: $0, timestamp: reorderedTimestamp, duration: 0)
-        } 
+        print("Original words:",
+              flatWords.map { $0.word })
+
+        // Step 2: Remove fillers
+        let filteredWords = flatWords
+            .map { $0.word }
+            .filter { !ignoredWords.contains($0) }
 
         print("Filtered words:", filteredWords)
-        print("Reordered words:", reorderedWords)
 
-        // Step 4: Run existing gloss mapping on the reordered words.
+        // Step 3: ISL Reordering
+        let reorderedWords = reorderToISL(filteredWords)
+
+        print("ISL reordered:", reorderedWords)
+
+        // Step 4: Generate gloss timeline
+
         var events: [GlossEvent] = []
+
+        var currentTime: Double = 0
+
+        let glossDuration: Double = 0.8
+
         var i = 0
-        
-        while i < reorderedFlatWords.count {
-            let word = reorderedFlatWords[i].word
-            
+
+        while i < reorderedWords.count {
+
+            let word = reorderedWords[i]
+
             var foundPhrase = false
-            
-            // Phrase lookup (multi-word)
-            for length in stride(from: min(maxPhraseLength, reorderedFlatWords.count - i), through: 1, by: -1) {
-                let phrase = reorderedFlatWords[i..<i+length]
-                    .map { $0.word }
+
+            let maxLookup = min(5, reorderedWords.count - i)
+
+            // try 5-word phrase max
+            for length in stride(from: maxLookup, through: 1, by: -1) {
+
+                let phrase = reorderedWords[i..<i+length]
                     .joined(separator: " ")
-                
-                if let gloss = phraseDictionary[phrase] {
-                    print("Phrase detected:", phrase, "->", gloss)
-                    let last = reorderedFlatWords[i + length - 1]
-                    let endTime = last.timestamp + last.duration
-                    events.append(GlossEvent(gloss: gloss.lowercased(), time: endTime))
+
+                if DatabaseManager.shared.hasGloss(for: phrase) {
+
+                    events.append(
+                        GlossEvent(
+                            gloss: phrase.lowercased(),
+                            time: currentTime
+                        )
+                    )
+
+                    currentTime += glossDuration
                     i += length
                     foundPhrase = true
                     break
                 }
             }
-            if foundPhrase { continue }
-            
-            // Number detection
-            if let numberGloss = numbersDictionary[word] {
-                let endTime = reorderedFlatWords[i].timestamp + reorderedFlatWords[i].duration
-                events.append(GlossEvent(gloss: numberGloss, time: endTime))
+
+            if foundPhrase {
+                continue
+            }
+
+            // Number lookup
+            if DatabaseManager.shared.hasGloss(for: word) {
+
+                events.append(
+                    GlossEvent(
+                        gloss: word,
+                        time: currentTime
+                    )
+                )
+
+                currentTime += glossDuration
                 i += 1
                 continue
             }
-            
-            // Number split digit-wise
+
+            // Digit split
             if Int(word) != nil {
-                let endTime = reorderedFlatWords[i].timestamp + reorderedFlatWords[i].duration
-                for digit in word {
-                    if let gloss = numbersDictionary[String(digit)] {
-                        events.append(GlossEvent(gloss: gloss, time: endTime))
-                    }
-                }
+
+                for _ in word {
+
+                    if DatabaseManager.shared.hasGloss(for: word) {
+
+                        events.append(
+                            GlossEvent(
+                                gloss: word,
+                                time: currentTime
+                            )
+                        )
+
+                        currentTime += glossDuration
+                        i += 1
+                        continue
+                    }                }
+
                 i += 1
                 continue
             }
-            
+
             // Alphabet fallback
-            let endTime = reorderedFlatWords[i].timestamp + reorderedFlatWords[i].duration
+            var spelled = false
+
             for char in word {
-                if let letter = alphabetDictionary[char] {
-                    events.append(GlossEvent(gloss: letter, time: endTime))
+
+                let letter = String(char).lowercased()
+
+                if DatabaseManager.shared.hasGloss(for: letter) {
+
+                    events.append(
+                        GlossEvent(
+                            gloss: letter,
+                            time: currentTime
+                        )
+                    )
+
+                    currentTime += 0.3
+                    spelled = true
                 }
             }
+
+            if !spelled {
+
+                // Direct gloss fallback
+                events.append(
+                    GlossEvent(
+                        gloss: word,
+                        time: currentTime
+                    )
+                )
+
+                currentTime += glossDuration
+            }
+
             i += 1
         }
-        
+
         return events
     }
 }

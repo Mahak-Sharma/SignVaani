@@ -93,11 +93,65 @@ extension AvatarWebViewProtocol {
                 <div class="gloss-text">Current Gloss: <span id="glossDisplay">...</span></div>
             </div>
             <script>
+                let lastGloss = null;
+                let currentTimer = null;
+
+                function currentGlossLabel(word) {
+                    return Array.isArray(word) ? 'animation' : word;
+                }
+
+                function finishFallbackPlayback() {
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.avatarDone) {
+                        window.webkit.messageHandlers.avatarDone.postMessage("done");
+                    }
+                }
+
                 function playGlossFromJSON(word) {
-                    document.getElementById('glossDisplay').textContent = word;
+                    lastGloss = word;
+                    document.getElementById('glossDisplay').textContent = currentGlossLabel(word);
                     const circle = document.querySelector('.avatar-circle');
                     circle.style.transform = 'scale(1.2)';
-                    setTimeout(() => { circle.style.transform = 'scale(1)'; }, 500);
+                    setTimeout(() => {
+                        circle.style.transform = 'scale(1)';
+                        finishFallbackPlayback();
+                    }, 500);
+                }
+
+                function pauseGlossPlayback() {}
+
+                function resumeGlossPlayback() {
+                    if (lastGloss !== null) {
+                        playGlossFromJSON(lastGloss);
+                    }
+                }
+
+                function rewindGlossPlayback() {
+                    if (lastGloss !== null) {
+                        playGlossFromJSON(lastGloss);
+                    }
+                }
+
+                function forwardGlossPlayback() {
+                    if (lastGloss !== null) {
+                        playGlossFromJSON(lastGloss);
+                    }
+                }
+
+                function restartGlossPlayback() {
+                    if (lastGloss !== null) {
+                        playGlossFromJSON(lastGloss);
+                    }
+                }
+
+                function replayLastGloss() {
+                    if (lastGloss !== null) {
+                        playGlossFromJSON(lastGloss);
+                    }
+                }
+
+                function stopGlossPlayback() {
+                    document.getElementById('glossDisplay').textContent = '...';
+                    document.querySelector('.avatar-circle').style.transform = 'scale(1)';
                 }
             </script>
         </body>

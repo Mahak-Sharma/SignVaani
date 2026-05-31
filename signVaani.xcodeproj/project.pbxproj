@@ -97,7 +97,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2620;
-				LastUpgradeCheck = 2620;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					7AF302B52F2CC463009EAF6F = {
 						CreatedOnToolsVersion = 26.2;
@@ -154,13 +154,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 2BNQ3FFD52;
+				DEVELOPMENT_TEAM = R622W57D23;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = signVaani/Info.plist;
-				INFOPLIST_KEY_NSFileProviderDomainUsageDescription = "";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Select video from gallery to generate avatar\nSelect video from gallery to generate avatar\nSelect video from gallery to generate avatar";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "";
+				INFOPLIST_KEY_NSFileProviderDomainUsageDescription = "This app usesile access to let user import, save and manage translated videos and other content from their device storage.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses the microphone to capture spoken input and convert it into Indian Sign Language animations using avatar.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app uses photo library so that user can select and upload videos and get Indian Sign Language Translation of those videos.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "This app sends audio to Apple's Speech Recognition framework to convert speech into text for generating captions.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -171,7 +171,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.signVaani;
+				PRODUCT_BUNDLE_IDENTIFIER = com.signVaani.example;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -190,13 +190,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 2BNQ3FFD52;
+				DEVELOPMENT_TEAM = 9BQV3SB9Z8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = signVaani/Info.plist;
-				INFOPLIST_KEY_NSFileProviderDomainUsageDescription = "";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Select video from gallery to generate avatar\nSelect video from gallery to generate avatar\nSelect video from gallery to generate avatar";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "";
+				INFOPLIST_KEY_NSFileProviderDomainUsageDescription = "This app usesile access to let user import, save and manage translated videos and other content from their device storage.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app uses the microphone to capture spoken input and convert it into Indian Sign Language animations using avatar.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app uses photo library so that user can select and upload videos and get Indian Sign Language Translation of those videos.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "This app sends audio to Apple's Speech Recognition framework to convert speech into text for generating captions.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -207,7 +207,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.signVaani;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bhaviiiiiiiiiiiiiiiiiiiiii.example;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -277,6 +277,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -333,6 +334,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};

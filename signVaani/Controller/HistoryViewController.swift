@@ -1,5 +1,6 @@
 import UIKit
 import PhotosUI
+import AVFoundation
 
 class HistoryViewController: UIViewController {
   
@@ -66,11 +67,12 @@ class HistoryViewController: UIViewController {
 
         // Create gradient
         let gradient = CAGradientLayer()
+        gradient.name = "gradientLayer"
         gradient.colors = [
             UIColor(red: 234/255, green: 242/255, blue: 255/255, alpha: 1).cgColor,
             UIColor(red: 163/255, green: 198/255, blue: 255/255, alpha: 1).cgColor
         ]
-        gradient.locations = [0.0, 0.7]  // Removed extra 1.0 location
+        gradient.locations = [0.0, 0.7]
         gradient.startPoint = CGPoint(x: 0.5, y: 0.0)
         gradient.endPoint = CGPoint(x: 0.5, y: 1.0)
         gradient.frame = view.bounds
@@ -78,25 +80,11 @@ class HistoryViewController: UIViewController {
     }
     
     private func setupSortButton() {
-        // Configure sort button with SF Symbol (arrow up down)
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        _ = UIImage(systemName: "arrow.up.arrow.down", withConfiguration: symbolConfig)
-        
-//        sortButton.setTitle("Sort", for: .normal)
-//        sortButton.setImage(sortImage, for: .normal)
-//        sortButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-//        sortButton.tintColor = .systemBlue
-        
-        // Adjust spacing between image and title
-//        sortButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -4, bottom: 0, right: 4)
-//        sortButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 4, bottom: 0, right: -4)
-        
-        // Create compact menu
         updateSortMenu()
     }
     
     private func updateSortMenu() {
-        // Create menu items with ARROW icons (no calendar)
+        // Create menu items
         let newest = UIAction(title: "Newest First") { [weak self] _ in
             self?.currentSort = .newest
             self?.refreshDisplay()
@@ -198,20 +186,31 @@ class HistoryViewController: UIViewController {
         }
     }
     
-    // MARK: - Add Video
+    //Add Video
     @IBAction func addVideoTapped(_ sender: UIButton) {
         if !searchBar.isHidden {
             hideSearchBar()
         }
-        
+
         var config = PHPickerConfiguration()
         config.filter = .videos
         config.selectionLimit = 1
 
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
+        picker.modalPresentationStyle = .fullScreen
 
-        present(picker, animated: true)
+        // Open picker
+        self.present(picker, animated: true) {
+            // Show alert after picker opens
+            let alert = UIAlertController(
+                title: "Note",
+                message: "Please select a video shorter than 1 minute.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            picker.present(alert, animated: true)
+        }
     }
 
     private func setupCollectionView() {
@@ -260,19 +259,135 @@ class HistoryViewController: UIViewController {
 
         return UICollectionViewCompositionalLayout(section: section)
     }
+    
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
-        let titleColor = UIColor(red: 47/255, green: 74/255, blue: 107/255, alpha: 1)
     }
+    
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "goToPlayer" {
-            if let destination = segue.destination as? LocalVideoAvatarViewController,
+            if let destination = segue.destination as? LiveViewController,
                let video = selectedVideo {
                 let url = URL(fileURLWithPath: video.videoPath)
-                destination.selectedVideoURL = url
+                destination.incomingVideoURL = url
             }
         }
+    }
+    
+    private func checkVideoDuration(from url: URL) {
+        let asset = AVURLAsset(url: url)
+        Task { [weak self] in
+            do {
+                let loadedDuration = try await asset.load(.duration)
+                let seconds = loadedDuration.seconds
+                await MainActor.run { [weak self] in
+                    guard let self = self else { return }
+                    if seconds > 60 {
+                        self.showLongVideoAlert()
+                    } else {
+                        self.proceedWithVideoUpload(from: url, duration: seconds)
+                    }
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.showErrorAlert(message: "Failed to load video duration: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func showLongVideoAlert() {
+        let alert = UIAlertController(
+            title: "Video Too Long",
+            message: "Please select a video shorter than 1 minute. Your video exceeds the time limit.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { [weak self] _ in
+            // Re-open the video picker
+            self?.addVideoTapped(self?.addVideo ?? UIButton())
+        })
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .destructive) { _ in
+            // Just dismiss, stay in history view
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func proceedWithVideoUpload(from sourceURL: URL, duration: Double) {
+        let fileName = UUID().uuidString + ".mov"
+        let destinationURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(fileName)
+
+        do {
+            // Check if file already exists and remove it
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            
+            // Copy the video file
+            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            
+            let alert = UIAlertController(
+                title: "Video Confirmation",
+                message: String(format: "Video duration: %.1f seconds\n\nAre you sure you want to upload this video?", duration),
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Proceed", style: .default) { [weak self] _ in
+                guard let self = self else { return }
+                
+                let newVideo = VideoItem(
+                    id: UUID().uuidString,
+                    title: "New Video",
+                    thumbnail: "thumbnail",
+                    videoPath: destinationURL.path,
+                    duration: duration,
+                    createdAt: Date()
+                )
+
+                HistoryManager.shared.addVideo(newVideo)
+                
+                if self.isSearching {
+                    self.hideSearchBar()
+                }
+                
+                self.collectionView.reloadData()
+                self.updateEmptyState()
+                self.selectedVideo = newVideo
+                self.performSegue(withIdentifier: "goToPlayer", sender: self)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { [weak self] _ in
+                // Delete the copied file if user chooses another video
+                try? FileManager.default.removeItem(at: destinationURL)
+                // Reopen picker
+                guard let self = self else { return }
+                self.addVideoTapped(self.addVideo)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Cancel", style: .destructive) { _ in
+                // Clean up the copied file
+                try? FileManager.default.removeItem(at: destinationURL)
+            })
+            
+            self.present(alert, animated: true)
+            
+        } catch {
+            showErrorAlert(message: "Failed to save video: \(error.localizedDescription)")
+        }
+    }
+    
+    private func showErrorAlert(message: String) {
+        let alert = UIAlertController(
+            title: "Error",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 }
 
@@ -402,62 +517,64 @@ extension HistoryViewController: UISearchBarDelegate {
     }
 }
 
-// MARK: - PHPicker
+// MARK: - PHPickerViewControllerDelegate
 extension HistoryViewController: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
 
         guard let itemProvider = results.first?.itemProvider else { return }
 
-        if itemProvider.hasItemConformingToTypeIdentifier("public.movie") {
-            itemProvider.loadFileRepresentation(forTypeIdentifier: "public.movie") { url, error in
-                
-                guard let url = url else { return }
-
-                let fileName = UUID().uuidString + ".mov"
-                let destinationURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                    .appendingPathComponent(fileName)
-
-                try? FileManager.default.copyItem(at: url, to: destinationURL)
-
+        if itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+            // Use the modern API to load the video
+            itemProvider.loadItem(forTypeIdentifier: UTType.movie.identifier, options: nil) { [weak self] (item, error) in
                 DispatchQueue.main.async {
-                    let alert = UIAlertController(
-                        title: "Video Confirmation",
-                        message: "Are you sure you want to upload this video?",
-                        preferredStyle: .alert
-                    )
+                    guard let self = self else { return }
                     
-                    alert.addAction(UIAlertAction(title: "Proceed", style: .default) { _ in
-                        let newVideo = VideoItem(
-                            id: UUID().uuidString,
-                            title: "New Video",
-                            thumbnail: "thumbnail",
-                            videoPath: destinationURL.path,
-                            duration: 0,
-                            createdAt: Date()
-                        )
-
-                        HistoryManager.shared.addVideo(newVideo)
-                        
-                        if self.isSearching {
-                            self.hideSearchBar()
+                    if let error = error {
+                        self.showErrorAlert(message: "Failed to load video: \(error.localizedDescription)")
+                        return
+                    }
+                    
+                    // Handle both URL and Data cases
+                    if let url = item as? URL {
+                        // Create a temporary copy since the original might be inaccessible
+                        self.processVideoFromURL(url)
+                    } else if let data = item as? Data {
+                        // Save data to temporary file
+                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+                        do {
+                            try data.write(to: tempURL)
+                            self.processVideoFromURL(tempURL)
+                        } catch {
+                            self.showErrorAlert(message: "Failed to process video data")
                         }
-                        
-                        self.collectionView.reloadData()
-                        self.updateEmptyState()
-                        self.selectedVideo = newVideo
-                        self.performSegue(withIdentifier: "goToPlayer", sender: self)
-                    })
-                    
-                    alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { _ in
-                        self.addVideoTapped(self.addVideo)
-                    })
-                    
-                    alert.addAction(UIAlertAction(title: "Cancel", style: .destructive))
-
-                    self.present(alert, animated: true)
+                    } else {
+                        self.showErrorAlert(message: "Unsupported video format")
+                    }
                 }
             }
+        }
+    }
+    
+    private func processVideoFromURL(_ url: URL) {
+        // Create a permanent copy in our app's directory
+        let fileName = UUID().uuidString + ".mov"
+        let destinationURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(fileName)
+        
+        do {
+            // Remove if exists
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            
+            // Copy the file
+            try FileManager.default.copyItem(at: url, to: destinationURL)
+            
+            // Now check duration on our local copy
+            checkVideoDuration(from: destinationURL)
+        } catch {
+            showErrorAlert(message: "Failed to save video: \(error.localizedDescription)")
         }
     }
 }

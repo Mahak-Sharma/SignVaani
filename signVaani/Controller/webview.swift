@@ -6,12 +6,9 @@ import AVKit
 
 //AvatarWebViewProtocol Conformance
 //setupWebView() aur loadFallbackAvatar() ab protocol se aate hain — no duplicate code
-extension LocalVideoAvatarViewController: AvatarWebViewProtocol {
-    
-}
 
-// MARK: - Gloss Playback
-extension LocalVideoAvatarViewController {
+//Gloss Playback
+extension LocalVideoAvatarViewController:AvatarWebViewProtocol{
 
     // Send gloss word to JavaScript in the WebView
     func playGloss(_ gloss: String) {
@@ -28,13 +25,13 @@ extension LocalVideoAvatarViewController {
         webView.evaluateJavaScript(js) { _, error in
             if let error = error {
                 print("JS Error for [\(normalized)]:", error)
-                self.isPlayingGloss = false  // ← unblock on JS failure too
+                self.isPlayingGloss = false  // unblock on JS failure too
             }
         }
     }
 }
 
-// MARK: - WKNavigationDelegate
+//WKNavigationDelegate
 extension LocalVideoAvatarViewController: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -69,7 +66,7 @@ extension LocalVideoAvatarViewController: WKNavigationDelegate {
     }
 }
 
-// MARK: - WKScriptMessageHandler
+//WKScriptMessageHandler
 extension LocalVideoAvatarViewController: WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController,
