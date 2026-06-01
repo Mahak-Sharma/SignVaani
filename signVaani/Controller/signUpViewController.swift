@@ -17,7 +17,7 @@ class signUpViewController: UIViewController {
     @IBOutlet weak var nameTextField: UITextField!
     @IBOutlet weak var genderSegment: UISegmentedControl!
     @IBOutlet weak var dobPicker: UIDatePicker!
-    @IBOutlet weak var continueButton: UIButton!
+    @IBOutlet weak var saveButton: UIButton!
 
     // MARK: - VIEW DID LOAD
     override func viewDidLoad() {
@@ -51,7 +51,7 @@ class signUpViewController: UIViewController {
         userNameView.layer.cornerRadius = 12
         genderView.layer.cornerRadius = 12
         dobView.layer.cornerRadius = 12
-        continueButton.layer.cornerRadius = 12
+        saveButton.layer.cornerRadius = 12
         
         dobPicker.datePickerMode = .date
         dobPicker.maximumDate = Date()
@@ -76,7 +76,7 @@ class signUpViewController: UIViewController {
     }
 
     // MARK: - CONTINUE BUTTON
-    @IBAction func continueTapped(_ sender: UIButton) {
+    @IBAction func saveButtonTapped(_ sender: UIButton) {
         let name = nameTextField.text ?? ""
         
         // Validate inputs
@@ -106,8 +106,11 @@ class signUpViewController: UIViewController {
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
         let homeVC = storyboard.instantiateViewController(withIdentifier: "HomeViewController")
         
-        // This completely replaces the root view controller
-        if let window = UIApplication.shared.windows.first {
+        // This completely replaces the root view controller using a scene-aware approach
+        if let window = self.view.window ?? (UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first(where: { $0.isKeyWindow })) {
             window.rootViewController = UINavigationController(rootViewController: homeVC)
             window.makeKeyAndVisible()
         }
@@ -141,3 +144,4 @@ class signUpViewController: UIViewController {
         present(alert, animated: true)
     }
 }
+
