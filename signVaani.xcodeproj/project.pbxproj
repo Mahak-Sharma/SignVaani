@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		D60BC6E42F3300050080D10F /* YouTubeiOSPlayerHelper in Frameworks */ = {isa = PBXBuildFile; productRef = D60BC6E32F3300050080D10F /* YouTubeiOSPlayerHelper */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		7AF302B62F2CC463009EAF6F /* signVaani.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = signVaani.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -40,7 +36,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D60BC6E42F3300050080D10F /* YouTubeiOSPlayerHelper in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -83,7 +78,6 @@
 			);
 			name = signVaani;
 			packageProductDependencies = (
-				D60BC6E32F3300050080D10F /* YouTubeiOSPlayerHelper */,
 			);
 			productName = signVaani;
 			productReference = 7AF302B62F2CC463009EAF6F /* signVaani.app */;
@@ -114,7 +108,6 @@
 			mainGroup = 7AF302AD2F2CC463009EAF6F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				D60BC6E22F3300050080D10F /* XCRemoteSwiftPackageReference "youtube-ios-player-helper" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7AF302B72F2CC463009EAF6F /* Products */;
@@ -164,7 +157,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -200,7 +193,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -362,25 +355,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		D60BC6E22F3300050080D10F /* XCRemoteSwiftPackageReference "youtube-ios-player-helper" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/youtube/youtube-ios-player-helper";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.4;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		D60BC6E32F3300050080D10F /* YouTubeiOSPlayerHelper */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = D60BC6E22F3300050080D10F /* XCRemoteSwiftPackageReference "youtube-ios-player-helper" */;
-			productName = YouTubeiOSPlayerHelper;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7AF302AE2F2CC463009EAF6F /* Project object */;
 }

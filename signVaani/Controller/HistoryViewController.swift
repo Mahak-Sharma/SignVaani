@@ -277,24 +277,63 @@ class HistoryViewController: UIViewController {
     
     private func checkVideoDuration(from url: URL) {
         let asset = AVURLAsset(url: url)
+
         Task { [weak self] in
+            guard let self = self else { return }
+
+            // Check audio first
+            let hasAudio = await checkVideoHasAudio(asset)
+
+            if !hasAudio {
+                await MainActor.run {
+                    self.showNoAudioAlert()
+                }
+                return
+            }
+
             do {
                 let loadedDuration = try await asset.load(.duration)
                 let seconds = loadedDuration.seconds
-                await MainActor.run { [weak self] in
-                    guard let self = self else { return }
+
+                await MainActor.run {
                     if seconds > 60 {
                         self.showLongVideoAlert()
                     } else {
                         self.proceedWithVideoUpload(from: url, duration: seconds)
                     }
                 }
+
             } catch {
-                await MainActor.run { [weak self] in
-                    self?.showErrorAlert(message: "Failed to load video duration: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.showErrorAlert(message: "Failed to read video duration.")
                 }
             }
         }
+    }
+    
+    private func checkVideoHasAudio(_ asset: AVAsset) async -> Bool {
+        do {
+            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+            return !audioTracks.isEmpty
+        } catch {
+            return false
+        }
+    }
+    
+    private func showNoAudioAlert() {
+        let alert = UIAlertController(
+            title: "No Audio Found",
+            message: "The selected video does not contain audio. Please choose another video.",
+            preferredStyle: .alert
+        )
+
+        alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { [weak self] _ in
+            self?.addVideoTapped(self?.addVideo ?? UIButton())
+        })
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .destructive))
+
+        present(alert, animated: true)
     }
     
     private func showLongVideoAlert() {
@@ -305,13 +344,10 @@ class HistoryViewController: UIViewController {
         )
         
         alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { [weak self] _ in
-            // Re-open the video picker
             self?.addVideoTapped(self?.addVideo ?? UIButton())
         })
         
-        alert.addAction(UIAlertAction(title: "Cancel", style: .destructive) { _ in
-            // Just dismiss, stay in history view
-        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .destructive))
         
         present(alert, animated: true)
     }
