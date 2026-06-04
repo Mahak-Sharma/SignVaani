@@ -12,7 +12,7 @@ class LiveViewController: UIViewController {
     @IBOutlet weak var outerView: UIView!
     @IBOutlet weak var micButton: UIButton!
     
-    // CHANGE 1: Video URL property — agar set hai toh video mode, nahi toh mic mode
+    //Video URL property — agar set hai toh video mode, nahi toh mic mode
     var incomingVideoURL: URL?
     
     //Speech Recognition Properties
@@ -23,6 +23,7 @@ class LiveViewController: UIViewController {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var pendingSegments: [SFTranscriptionSegment] = []
     private var glossEvents: [GlossEvent] = []
+    private var originalGlossEvents: [GlossEvent] = []
     private var lastProcessedSegment = 0
     private var isListening = false
     private var isAvatarAnimating = false
@@ -31,8 +32,6 @@ class LiveViewController: UIViewController {
     private var playbackControlsView: UIVisualEffectView?
     private var restartButton: UIButton?
     private var playPauseButton: UIButton?
-    
-    // ========== PROGRESSIVE CAPTION BUILDING PROPERTIES ==========
     private var accumulatedCaption: String = ""
     private var currentGlossQueue: [String] = []
     private var currentQueueIndex: Int = 0
@@ -41,7 +40,6 @@ class LiveViewController: UIViewController {
     private var currentSpellingIndex: Int = 0
     private var scrollTimer: Timer?
     private var needsSpaceBeforeNext: Bool = false
-    // ============================================================
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -60,7 +58,7 @@ class LiveViewController: UIViewController {
         outerView.layer.cornerRadius = 25
         outerView.clipsToBounds = true
         
-        // ✅ CHANGE 2: Agar video URL mila toh mic hide karo aur auto start karo
+        //Agar video URL mila toh mic hide karo aur auto start karo
         if let videoURL = incomingVideoURL {
             micButton.isHidden = true
             recordView.isHidden = true
@@ -232,22 +230,30 @@ class LiveViewController: UIViewController {
     }
     
     @objc private func restartButtonTapped() {
-        resetCaptionBuilding()
-        
-        if isAvatarAnimating || isAvatarPaused || lastPlayedGloss != nil {
-            isAvatarAnimating = true
-            isAvatarPaused = false
-            updatePlaybackControlState()
-            runAvatarJavaScript("restartGlossPlayback()") { [weak self] success in
-                guard let self = self else { return }
-                if !success {
-                    self.isAvatarAnimating = false
-                    self.updatePlaybackControlState()
-                }
-            }
-            return
-        }
-        
+        // Stop whatever is currently playing in JS
+        runAvatarJavaScript("stopGlossPlayback()")
+
+        // Reset all playback + caption state
+        isAvatarAnimating = false
+        isAvatarPaused = false
+        isSpellingMode = false
+        currentSpellingWord = ""
+        currentSpellingIndex = 0
+        currentQueueIndex = 0
+        lastPlayedGloss = nil
+
+        // Restore the original gloss queue
+        glossEvents = originalGlossEvents
+        currentGlossQueue = originalGlossEvents.map { $0.gloss.uppercased() }
+
+        // Clear captions so they rebuild from scratch
+        accumulatedCaption = ""
+        needsSpaceBeforeNext = false
+        captionLabel.attributedText = nil
+
+        updatePlaybackControlState()
+
+        // Re-run the queue through Swift so captions rebuild correctly
         if !glossEvents.isEmpty {
             playGlossQueue()
         }
@@ -444,7 +450,7 @@ class LiveViewController: UIViewController {
             self.micButton.setImage(UIImage(systemName: "mic.fill"), for: .normal)
             self.recordView.layer.sublayers?.filter { $0.name == "pulse" }.forEach { $0.removeFromSuperlayer() }
             self.recordView.backgroundColor = .lightGray
-            self.captionLabel.text = "Processing..."
+            self.captionLabel.text = "⏳ Processing..."
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
@@ -499,13 +505,15 @@ class LiveViewController: UIViewController {
         needsSpaceBeforeNext = false
         accumulatedCaption = ""
         captionLabel.attributedText = nil
-        
+        glossEvents.removeAll()
+        glossEvents.append(contentsOf: events)
+        originalGlossEvents = events
         if !glossEvents.isEmpty && !isAvatarAnimating && !isAvatarPaused {
             playGlossQueue()
         }
     }
     
-    // CHANGE 3: Video se audio extract karke speech recognition chalao
+    //Video se audio extract karke speech recognition chalao
     private func extractAndProcess(videoURL: URL) {
         let asset = AVURLAsset(url: videoURL)
         
@@ -527,7 +535,7 @@ class LiveViewController: UIViewController {
                 try await exportSession.export(to: audioURL, as: .m4a)
                 print("Audio extract ho gaya")
                 await MainActor.run {
-                    self.captionLabel.text = " Recognizing speech..."
+                    self.captionLabel.text = "⏳ Recognizing speech..."
                     self.recognizeAudioFile(url: audioURL)
                 }
             } catch {
@@ -614,92 +622,130 @@ class LiveViewController: UIViewController {
             accumulatedCaption += " "
             needsSpaceBeforeNext = false
         }
-        
-        let oldLength = accumulatedCaption.count
         accumulatedCaption += wordOrLetter
-        
-        let highlightRange: NSRange
-        if isCompleteWord {
-            highlightRange = NSRange(location: oldLength, length: wordOrLetter.count)
-        } else {
-            highlightRange = NSRange(location: accumulatedCaption.count - 1, length: 1)
-        }
-        
-        updateCaptionDisplay(highlightRange: highlightRange)
-        
+
         if isCompleteWord {
             needsSpaceBeforeNext = true
         }
+
+        // Always highlight the last word/letter added
+        let highlightStart = accumulatedCaption.count - wordOrLetter.count
+        let highlightRange = NSRange(location: highlightStart, length: wordOrLetter.count)
+        updateCaptionDisplay(highlightRange: highlightRange)
     }
     
     private func updateCaptionDisplay(highlightRange: NSRange) {
-        let attributedString = NSMutableAttributedString(string: accumulatedCaption)
-        
-        attributedString.addAttribute(.foregroundColor,
-                                      value: UIColor.black,
-                                      range: NSRange(location: 0, length: accumulatedCaption.count))
-        
-        if highlightRange.location + highlightRange.length <= accumulatedCaption.count {
-            attributedString.addAttribute(.foregroundColor,
-                                          value: UIColor.systemBlue,
-                                          range: highlightRange)
-        }
-        
-        captionLabel.attributedText = attributedString
-        checkAndScrollCaption()
-    }
-    
-    private func checkAndScrollCaption() {
-        guard let attributedText = captionLabel.attributedText else { return }
-        
-        let textSize = attributedText.size()
+        stopScrolling()
+        captionLabel.layer.sublayerTransform = CATransform3DIdentity
+
+        let font = captionLabel.font ?? UIFont.systemFont(ofSize: 17)
         let labelWidth = captionLabel.bounds.width
-        
-        if textSize.width > labelWidth {
-            startScrollingIfNeeded()
-        } else {
-            stopScrolling()
+        guard labelWidth > 0 else { return }
+
+        let fullText = accumulatedCaption
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .kern: NSNumber(value: 0)   // force zero kern so measurement matches rendering
+        ]
+
+        // Accurate width measurement via boundingRect
+        func measureWidth(_ text: String) -> CGFloat {
+            guard !text.isEmpty else { return 0 }
+            let rect = (text as NSString).boundingRect(
+                with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: 200),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attrs,
+                context: nil
+            )
+            return ceil(rect.width)   // ceil to avoid sub-pixel clipping
         }
+
+        let fullWidth = measureWidth(fullText)
+
+        // Build full attributed string
+        let fullAttr = NSMutableAttributedString(string: fullText, attributes: attrs)
+        fullAttr.addAttribute(.foregroundColor, value: UIColor.black,
+                              range: NSRange(location: 0, length: fullText.count))
+        if highlightRange.location + highlightRange.length <= fullText.count {
+            fullAttr.addAttribute(.foregroundColor, value: UIColor.systemBlue,
+                                  range: highlightRange)
+        }
+
+        // If everything fits — show as is
+        guard fullWidth > labelWidth else {
+            captionLabel.attributedText = fullAttr
+            return
+        }
+
+        // ── Overflow: pin active word to right edge ──
+        let textUpToHighlightEnd = (fullText as NSString)
+            .substring(to: highlightRange.location + highlightRange.length)
+        // Extra buffer: 6pt so last character is never sub-pixel clipped
+        let highlightEndX = measureWidth(textUpToHighlightEnd) + 6
+
+        let windowEnd = highlightEndX
+        let windowStart = max(0, windowEnd - labelWidth)
+
+        // Walk chars to find where windowStart falls
+        var cumWidth: CGFloat = 0
+        var startCharIndex = 0
+        for i in 0..<fullText.count {
+            let ch = (fullText as NSString).substring(with: NSRange(location: i, length: 1))
+            let chWidth = measureWidth(ch)
+            if cumWidth + chWidth > windowStart {
+                startCharIndex = i
+                break
+            }
+            cumWidth += chWidth
+            startCharIndex = i + 1
+        }
+
+        // Slice to visible portion
+        let sliceStart = fullText.index(fullText.startIndex, offsetBy: startCharIndex)
+        let visibleString = String(fullText[sliceStart...])
+
+        let visibleAttr = NSMutableAttributedString(
+            string: visibleString,
+            attributes: [.font: font, .foregroundColor: UIColor.black]
+        )
+
+        // Remap highlight into sliced range
+        let newHighlightLoc = highlightRange.location - startCharIndex
+        let newHighlightLen = highlightRange.length
+        if newHighlightLoc >= 0 && (newHighlightLoc + newHighlightLen) <= visibleString.count {
+            visibleAttr.addAttribute(.foregroundColor, value: UIColor.systemBlue,
+                                     range: NSRange(location: newHighlightLoc, length: newHighlightLen))
+        }
+
+        captionLabel.attributedText = visibleAttr
     }
-    
-    private func startScrollingIfNeeded() {
-        guard scrollTimer == nil else { return }
-        
-        captionLabel.layer.sublayerTransform = CATransform3DMakeTranslation(0, 0, 0)
-        
-        scrollTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            let currentX = self.captionLabel.layer.sublayerTransform.m41
-            let textWidth = self.captionLabel.attributedText?.size().width ?? 0
-            let labelWidth = self.captionLabel.bounds.width
-            
-            if textWidth > labelWidth {
-                if currentX > -(textWidth - labelWidth) {
-                    let newX = currentX - 2
-                    self.captionLabel.layer.sublayerTransform = CATransform3DMakeTranslation(newX, 0, 0)
-                } else {
-                    self.removeFirstWordFromCaption()
-                }
+    // Binary-search for the character index whose glyph starts at or after `x`
+    private func characterIndex(in layoutManager: NSLayoutManager,
+                                 textContainer: NSTextContainer,
+                                 atX x: CGFloat,
+                                 fullLength: Int) -> Int {
+        var lo = 0
+        var hi = fullLength
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: NSRange(location: mid, length: 1),
+                actualCharacterRange: nil
+            )
+            let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            if rect.minX < x {
+                lo = mid + 1
+            } else {
+                hi = mid
             }
         }
+        return lo
     }
-    
-    private func removeFirstWordFromCaption() {
-        if let spaceIndex = accumulatedCaption.firstIndex(of: " ") {
-            let range = accumulatedCaption.startIndex...spaceIndex
-            accumulatedCaption.removeSubrange(range)
-            updateCaptionDisplay(highlightRange: NSRange(location: 0, length: 0))
-            captionLabel.layer.sublayerTransform = CATransform3DMakeTranslation(0, 0, 0)
-        } else {
-            stopScrolling()
-        }
-    }
-    
+
     private func stopScrolling() {
         scrollTimer?.invalidate()
         scrollTimer = nil
-        captionLabel.layer.sublayerTransform = CATransform3DMakeTranslation(0, 0, 0)
+        captionLabel.layer.sublayerTransform = CATransform3DIdentity
     }
     
     @discardableResult

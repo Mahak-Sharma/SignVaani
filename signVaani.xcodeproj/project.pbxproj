@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B0C4D2F42FCFF756006B5C30 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B0C4D2F32FCFF756006B5C30 /* WebKit.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		7AF302B62F2CC463009EAF6F /* signVaani.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = signVaani.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0C4D2F32FCFF756006B5C30 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -36,6 +41,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0C4D2F42FCFF756006B5C30 /* WebKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -46,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				7AF302B82F2CC463009EAF6F /* signVaani */,
+				B0C4D2F22FCFF756006B5C30 /* Frameworks */,
 				7AF302B72F2CC463009EAF6F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -56,6 +63,14 @@
 				7AF302B62F2CC463009EAF6F /* signVaani.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B0C4D2F22FCFF756006B5C30 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B0C4D2F32FCFF756006B5C30 /* WebKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

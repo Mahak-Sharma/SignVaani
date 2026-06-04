@@ -39,8 +39,8 @@ class intro2ViewController: UIViewController {
     }
     
     func playVideo() {
-        guard let path = Bundle.main.path(forResource: "introVaani2", ofType: "mp4") else {
-            print("introVaani2.mp4 not found")
+        guard let path = Bundle.main.path(forResource: "introVaani2", ofType: "mov") else {
+            print("introVaani2.mov not found")
             return
         }
         

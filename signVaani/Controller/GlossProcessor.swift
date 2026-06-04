@@ -7,7 +7,7 @@ class GlossProcessor {
 
     // Words usually removed in ISL gloss
     let ignoredWords: Set<String> = [
-        "is","am","are","was","were",
+        "and", "is", "am", "are","was","were",
         "the","a","an",
         "to","of","for",
         "will","shall","be","been",
@@ -32,13 +32,6 @@ class GlossProcessor {
         "not", "never", "no"
     ]
 
-//    lazy var maxPhraseLength: Int = {
-//        phraseDictionary.keys
-//            .map { $0.split(separator: " ").count }
-//            .max() ?? 1
-//    }()
-
-    //NLP Helpers
 
     func isVerb(_ word: String) -> Bool {
         let tagger = NLTagger(tagSchemes: [.lexicalClass])
