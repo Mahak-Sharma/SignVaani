@@ -20,13 +20,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         if hasCompletedSignup {
             // User has completed signup, go directly to home
-            print("✅ SIGNUP COMPLETED - Going directly to HOME SCREEN")
+            print("SIGNUP COMPLETED - Going directly to HOME SCREEN")
             let homeVC = storyboard.instantiateViewController(withIdentifier: "HomeViewController")
             let navController = UINavigationController(rootViewController: homeVC)
             window?.rootViewController = navController
         } else {
             // User hasn't signed up, show onboarding flow
-            print("❌ SIGNUP NOT COMPLETED - Showing Boarding Screen")
+            print("SIGNUP NOT COMPLETED - Showing Boarding Screen")
             let boardingVC = storyboard.instantiateViewController(withIdentifier: "boardingViewController")
             let navController = UINavigationController(rootViewController: boardingVC)
             window?.rootViewController = navController

@@ -100,7 +100,7 @@ class signUpViewController: UIViewController {
         UserDefaults.standard.set(true, forKey: "hasCompletedSignup")
         UserDefaults.standard.synchronize()
         
-        print("✅ SIGNUP COMPLETED - Flag: \(UserDefaults.standard.bool(forKey: "hasCompletedSignup"))")
+        print("SIGNUP COMPLETED: \(UserDefaults.standard.bool(forKey: "hasCompletedSignup"))")
         
         // Replace the entire navigation stack and go to Home
         let storyboard = UIStoryboard(name: "Main", bundle: nil)

@@ -101,7 +101,7 @@ extension LiveViewController {
 
         DispatchQueue.main.async {
             self.updateMicUIForListening(false)
-            self.captionLabel.text = "⏳ Processing..."
+            self.captionLabel.text = "Processing..."
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
@@ -177,34 +177,4 @@ extension LiveViewController {
             recordView.backgroundColor = .lightGray
         }
     }
-
-//    // MARK: - Single gloss playback helper
-//    private func playGloss(_ text: String) {
-//        // If there's a direct animation for the full spoken text, play it as a single gloss.
-//        if DatabaseManager.shared.getAnimationSmart(for: text) != nil {
-//            // Reset any existing state and play this one item
-//            stopAvatarPlayback(clearQueue: true, clearLastGloss: true)
-//            glossEvents = []
-//            originalGlossEvents = []
-//            currentGlossQueue = [text.uppercased()]
-//            currentQueueIndex = 0
-//            needsSpaceBeforeNext = false
-//            accumulatedCaption = ""
-//            captionLabel.attributedText = nil
-//            playGlossQueue()
-//            return;
-//        }
-//
-//        // Fallback: build events from the text and play via queue if no direct animation
-//        let segments = SFSpeechRecognitionResult()
-//        // Since we don't have segments here, use the glossProcessor to build from raw string if supported.
-//        // If not supported, just enqueue the uppercased text.
-//        if glossEvents.isEmpty {
-//            glossEvents = []
-//            originalGlossEvents = []
-//        }
-//        currentGlossQueue = [text.uppercased()]
-//        currentQueueIndex = 0
-//        playGlossQueue()
-//    }
 }

@@ -107,7 +107,7 @@ extension LiveViewController {
         updatePlaybackControlState()
 
         webView.evaluateJavaScript("playGlossFromJSON(\(safeString))") { [weak self] _, error in
-            if let error = error {
+            if error != nil {
                 self?.isAvatarAnimating = false
                 self?.updatePlaybackControlState()
                 completion?(false)

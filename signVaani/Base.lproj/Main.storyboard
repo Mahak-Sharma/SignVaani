@@ -69,7 +69,7 @@
                                                 <rect key="frame" x="144.66666666666666" y="28" width="104" height="104"/>
                                                 <subviews>
                                                     <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="video.fill.badge.plus" catalog="system" translatesAutoresizingMaskIntoConstraints="NO" id="9zi-LJ-1Bf">
-                                                        <rect key="frame" x="3.3333333333333339" y="8.3333333333333286" width="94.666666666666671" height="91"/>
+                                                        <rect key="frame" x="3.3333333333333353" y="8.3333333333333286" width="94.666666666666671" height="91"/>
                                                         <color key="tintColor" red="0.533203125" green="0.533203125" blue="0.533203125" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                                         <constraints>
                                                             <constraint firstAttribute="height" constant="92" id="jRz-sC-qQb"/>
@@ -1037,10 +1037,10 @@
                                 <rect key="frame" x="0.0" y="172" width="393" height="612"/>
                                 <subviews>
                                     <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="ua3-4I-JoV" userLabel="Content View">
-                                        <rect key="frame" x="0.0" y="0.0" width="393" height="558"/>
+                                        <rect key="frame" x="0.0" y="0.0" width="393" height="578.33333333333337"/>
                                         <subviews>
                                             <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" spacing="12" translatesAutoresizingMaskIntoConstraints="NO" id="MtP-6B-Nur">
-                                                <rect key="frame" x="20" y="40" width="353" height="498"/>
+                                                <rect key="frame" x="20" y="40" width="353" height="518.33333333333337"/>
                                                 <subviews>
                                                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" verticalHuggingPriority="251" text="Information We Collect" textAlignment="natural" lineBreakMode="tailTruncation" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="DSK-ZR-eHk">
                                                         <rect key="frame" x="0.0" y="0.0" width="353" height="20.333333333333332"/>
@@ -1108,8 +1108,10 @@
                                                         <nil key="textColor"/>
                                                         <nil key="highlightedColor"/>
                                                     </label>
-                                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="For any privacy concerns, contact support@example.com" textAlignment="natural" lineBreakMode="tailTruncation" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="9AW-O7-Z0E">
-                                                        <rect key="frame" x="0.0" y="457.33333333333337" width="353" height="40.666666666666686"/>
+                                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" textAlignment="natural" lineBreakMode="tailTruncation" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="9AW-O7-Z0E">
+                                                        <rect key="frame" x="0.0" y="457.33333333333337" width="353" height="61"/>
+                                                        <string key="text">For any privacy concerns, contact team.s.iosgehu@gmail.com
+</string>
                                                         <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                                         <nil key="textColor"/>
                                                         <nil key="highlightedColor"/>

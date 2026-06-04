@@ -49,7 +49,7 @@ extension LiveViewController {
 
             self.speechRecognizer?.recognitionTask(with: request) { [weak self] result, error in
                 guard let self else { return }
-                if let error = error {
+                if error != nil {
                     DispatchQueue.main.async { self.captionLabel.text = "Recognition failed" }
                     return
                 }
