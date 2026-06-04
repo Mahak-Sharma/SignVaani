@@ -38,7 +38,7 @@ class GlossProcessor {
 //            .max() ?? 1
 //    }()
 
-    // MARK: - NLP Helpers
+    //NLP Helpers
 
     func isVerb(_ word: String) -> Bool {
         let tagger = NLTagger(tagSchemes: [.lexicalClass])
@@ -119,7 +119,7 @@ class GlossProcessor {
             + questions
     }
 
-    // MARK: - Main Pipeline
+    //Main Pipeline
 
     func extractGlossTimeline(
         from segments: [SFTranscriptionSegment]
