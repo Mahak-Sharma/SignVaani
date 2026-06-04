@@ -27,7 +27,7 @@ extension LiveViewController {
             do {
                 try await exportSession.export(to: audioURL, as: .m4a)
                 await MainActor.run {
-                    self.captionLabel.text = "⏳ Recognizing speech..."
+                    self.captionLabel.text = "Recognizing speech..."
                     self.recognizeAudioFile(url: audioURL)
                 }
             } catch {

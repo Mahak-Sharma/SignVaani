@@ -12,6 +12,8 @@ class LiveViewController: UIViewController, WKNavigationDelegate, WKScriptMessag
     @IBOutlet weak var outerView: UIView!
     @IBOutlet weak var micButton: UIButton!
 
+    @IBOutlet weak var restartButton: UIButton!
+    @IBOutlet weak var playPauseButton: UIButton!
     var incomingVideoURL: URL?
 
     // Speech Recognition
@@ -45,10 +47,6 @@ class LiveViewController: UIViewController, WKNavigationDelegate, WKScriptMessag
     var isAvatarAnimating = false
     var isAvatarPaused = false
 
-    // Playback Controls
-    var playbackControlsView: UIVisualEffectView?
-    var restartButton: UIButton?
-    var playPauseButton: UIButton?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -58,7 +56,7 @@ class LiveViewController: UIViewController, WKNavigationDelegate, WKScriptMessag
         webView.configuration.userContentController.add(self, name: "avatarDone")
         setupMicButton()
         setupCaptionLabel()
-        setupAvatarPlaybackControls()
+      //  setupAvatarPlaybackControls()
         recordView.layer.cornerRadius = 6
         outerView.layer.cornerRadius = 25
         outerView.clipsToBounds = true
@@ -94,5 +92,39 @@ class LiveViewController: UIViewController, WKNavigationDelegate, WKScriptMessag
 
     @IBAction func micButtonTapped(_ sender: UIButton) {
         isListening ? stopSpeechRecognition() : requestPermissionsAndStart()
+    }
+    @IBAction func restartButtonTapped(_ sender: UIButton)
+    {
+        runAvatarJavaScript("stopGlossPlayback()")
+        isAvatarAnimating = false; isAvatarPaused = false
+        isSpellingMode = false; currentSpellingWord = ""; currentSpellingIndex = 0
+        currentQueueIndex = 0; lastPlayedGloss = nil
+        glossEvents = originalGlossEvents
+        currentGlossQueue = originalGlossEvents.map { $0.gloss.uppercased() }
+        accumulatedCaption = ""; needsSpaceBeforeNext = false
+        captionLabel.attributedText = nil
+        updatePlaybackControlState()
+        if !glossEvents.isEmpty { playGlossQueue() }
+    }
+    @IBAction func playPauseButtonTapped(_ sender: UIButton)
+    {
+        if isAvatarAnimating {
+            isAvatarAnimating = false; isAvatarPaused = true
+            updatePlaybackControlState()
+            runAvatarJavaScript("pauseGlossPlayback()")
+            return
+        }
+        if isAvatarPaused {
+            isAvatarAnimating = true; isAvatarPaused = false
+            updatePlaybackControlState()
+            runAvatarJavaScript("resumeGlossPlayback()") { [weak self] success in
+                if !success {
+                    self?.isAvatarAnimating = false; self?.isAvatarPaused = true
+                    self?.updatePlaybackControlState()
+                }
+            }
+            return
+        }
+        glossEvents.isEmpty ? replayLastPlayedGloss() : playGlossQueue()
     }
 }
