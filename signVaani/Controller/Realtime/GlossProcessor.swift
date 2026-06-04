@@ -1,6 +1,6 @@
 //GlossProcessor.swift
 import Foundation
-import Speech
+internal import Speech
 import NaturalLanguage
 
 class GlossProcessor {
