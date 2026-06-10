@@ -17,94 +17,74 @@ class ProfileController: UIViewController,
                          AvatarSelectionDelegate {
 
     //outlets created for username and profile picture
-
-    @IBOutlet weak var email: UILabel!
+    @IBOutlet weak var outerView: UIView!
+    
+    @IBOutlet weak var card1: UIView!
+    @IBOutlet weak var infoCard: UIView!
+    @IBOutlet weak var userName: UILabel!
+    @IBOutlet weak var innerView: UIView!
 
     @IBOutlet weak var name: UILabel!
 
     @IBOutlet weak var profileImage: UIImageView!
 
-    //this is separately made for username change,
-    //because the user can change their name
-    //by clicking on the username
-    //for edit icon to be displayed to change the pfp
-
-    let editIcon = UIImageView()
-
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // LOAD SAVED USER DATA
+        configureAppearance()
+        loadSavedProfile()
+    }
 
+    private func configureAppearance() {
+        navigationItem.rightBarButtonItem = nil
+
+        [card1, infoCard].forEach { card in
+            card?.backgroundColor = .white.withAlphaComponent(0.55)
+            card?.layer.cornerRadius = 16
+            card?.clipsToBounds = true
+        }
+
+        outerView.backgroundColor = .clear
+        innerView.backgroundColor = .clear
+        innerView.clipsToBounds = true
+        profileImage.contentMode = .scaleAspectFill
+        profileImage.clipsToBounds = true
+        profileImage.isUserInteractionEnabled = false
+
+        name.textColor = UIColor(
+            red: 12/255,
+            green: 56/255,
+            blue: 136/255,
+            alpha: 1
+        )
+    }
+
+    private func loadSavedProfile() {
         let savedName =
             UserDefaults.standard.string(
                 forKey: "userName"
             ) ?? "User"
 
-        let savedGender =
-            UserDefaults.standard.string(
-                forKey: "userGender"
-            ) ?? ""
-
-        let savedDOB =
-            UserDefaults.standard.string(
-                forKey: "userDOB"
-            ) ?? ""
-
-        // SHOW SAVED NAME
         name.text = savedName
+        userName.text = savedName
+        navigationItem.title = "\(savedName)'s Profile"
 
-        // SHOW EXTRA INFO
-        email.text = "\(savedGender) • \(savedDOB)"
+        let savedAvatar =
+            UserDefaults.standard.data(forKey: "userAvatar") ??
+            UserDefaults.standard.data(forKey: "savedAvatar")
 
-        // Add this after your existing UserDefaults loading code
-        if let data = UserDefaults.standard.data(forKey: "savedAvatar"),
+        if let data = savedAvatar,
            let savedImage = UIImage(data: data) {
             profileImage.image = savedImage
         } else {
-            profileImage.image = UIImage(named: "defaultAvatar") // your placeholder
+            profileImage.image = UIImage(named: "3247bef7-b265-43c2-9220-77f64bcec0d4")
         }
-        
-
-        // EDIT ICON SETUP
-
-        //using sf symbol to set edit icon image
-        editIcon.image = UIImage(systemName: "photo.fill")
-
-        //rest formatting
-        editIcon.tintColor = .black
-
-        editIcon.backgroundColor = .white
-
-        editIcon.layer.cornerRadius = 15
-
-        //ensures icon stays inside rounded corners
-        editIcon.clipsToBounds = true
-
-        editIcon.layer.borderWidth = 1
-
-        //tap on edit icon opens avatar popup
-        let tap = UITapGestureRecognizer(
-            target: self,
-            action: #selector(openAvatarPopup)
-        )
-
-        //recognizes tap on icon
-        editIcon.addGestureRecognizer(tap)
-
-        editIcon.isUserInteractionEnabled = true
-
-        //adds interaction to profile image
-        profileImage.isUserInteractionEnabled = true
-
-        //puts edit icon inside profile image
-        profileImage.addSubview(editIcon)
-
-        profileImage.clipsToBounds = false
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+
+        loadSavedProfile()
 
         navigationController?.setNavigationBarHidden(
             false,
@@ -119,44 +99,16 @@ class ProfileController: UIViewController,
         )
     }
 
-    // TO SET THE EDIT ICON TO THE BOTTOM RIGHT OF USER PFP
-
     override func viewDidLayoutSubviews() {
-
-        //after layout finalized
         super.viewDidLayoutSubviews()
 
-        //make profile image circular
-        profileImage.layer.cornerRadius =
-            profileImage.frame.height / 2
+        profileImage.layer.cornerRadius = profileImage.bounds.height / 2
+        innerView.layer.cornerRadius = innerView.bounds.height / 2
 
-        //icon size
-        let size: CGFloat = 20
-
-        //position icon bottom right
-        editIcon.frame = CGRect(
-            x: profileImage.bounds.width - size - 4,
-            y: profileImage.bounds.height - size - 4,
-            width: size,
-            height: size
-        )
-
-        editIcon.layer.cornerRadius = size / 2
-
-        editIcon.clipsToBounds = true
-
-        //bring icon to front
-        profileImage.bringSubviewToFront(editIcon)
-
-        //temp debug print
-        print(editIcon.frame)
-
-        // Remove duplicate gradient layers
         view.layer.sublayers?.removeAll {
             $0.name == "gradientLayer"
         }
 
-        // Create gradient
         let gradient = CAGradientLayer()
 
         gradient.name = "gradientLayer"
@@ -193,53 +145,12 @@ class ProfileController: UIViewController,
         )
     }
 
-    
-    //when user clicks return on keyboard
-    // when user taps edit icon,
-    // list of avatars appears
-
-    @objc func openAvatarPopup() {
-
-        //load storyboard
-        let storyboard = UIStoryboard(
-            name: "Main",
-            bundle: nil
-        )
-
-        //instance of image view controller
-        let vc = storyboard.instantiateViewController(
-            withIdentifier: "ImageViewController"
-        ) as! ImageViewController
-
-        //set delegate
-        vc.delegate = self
-
-        //display popup as bottom sheet
-        vc.modalPresentationStyle = .pageSheet
-
-        //popup behaviour and size
-        if let sheet = vc.sheetPresentationController {
-
-            //half screen popup
-            sheet.detents = [.medium()]
-
-            sheet.prefersGrabberVisible = true
-        }
-
-        //show popup
-        present(vc, animated: true)
-    }
-
-    //when user selects avatar
-
     func didSelectAvatar(image: UIImage) {
-
-        //update profile image
         profileImage.image = image
-        // Save to UserDefaults
-            if let data = image.pngData() {
-                UserDefaults.standard.set(data, forKey: "savedAvatar")
-            }
+
+        if let data = image.pngData() {
+            UserDefaults.standard.set(data, forKey: "userAvatar")
+        }
     }
 
     @IBAction func closeTapped(_ sender: UIButton) {

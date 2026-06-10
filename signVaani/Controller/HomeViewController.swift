@@ -4,15 +4,12 @@
 //
 //  Created by Shreya Bhardwaj on 25/03/26.
 //
-
 import UIKit
 import AVFoundation
 
 class HomeViewController: UIViewController {
 
-
     @IBOutlet weak var bigView: UIView!
-
     @IBOutlet weak var videoimageView: UIView!
     @IBOutlet weak var audioimageView: UIView!
 
@@ -22,21 +19,16 @@ class HomeViewController: UIViewController {
     @IBOutlet weak var profileImage: UIButton!
     @IBOutlet weak var audioImageView: UIView!
     @IBOutlet weak var videoImageView: UIView!
-
     @IBOutlet weak var namasteVideo: UIView!
 
-  
     var player: AVPlayer?
     var playerLayer: AVPlayerLayer?
 
-    
     override func viewDidLoad() {
         super.viewDidLoad()
 
         setupUI()
-
         setupVideo()
-
         setupCardGestures()
     }
 
@@ -49,12 +41,11 @@ class HomeViewController: UIViewController {
             true,
             animated: animated
         )
-        // In HomeViewController's viewWillAppear
-        if let data = UserDefaults.standard.data(forKey: "savedAvatar"),
+
+        // LOAD SAVED AVATAR
+        if let data = UserDefaults.standard.data(forKey: "userAvatar"),
            let savedImage = UIImage(data: data) {
-//
-//            profileImageView.setImage(savedImage, for: .normal)
-           // profileImage.setImage(savedImage, for: .normal)
+
             profileImageView.image = savedImage
             print("Avatar Loaded")
         }
@@ -65,15 +56,17 @@ class HomeViewController: UIViewController {
 
         setupGradient()
 
-        // Update video frame
+        profileImageView.layer.cornerRadius =
+            profileImageView.frame.width / 2
+
+        profileImageView.clipsToBounds = true
+
         playerLayer?.frame = namasteVideo.bounds
     }
-
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
         return .portrait
     }
-
 
     func setupUI() {
 
@@ -86,15 +79,12 @@ class HomeViewController: UIViewController {
         audioimageView.layer.cornerRadius = 25
     }
 
-
     func setupGradient() {
 
-        // Remove old gradient
         view.layer.sublayers?.removeAll {
             $0.name == "gradientLayer"
         }
 
-        // Create gradient
         let gradient = CAGradientLayer()
 
         gradient.name = "gradientLayer"
@@ -129,7 +119,6 @@ class HomeViewController: UIViewController {
         )
     }
 
-
     func setupVideo() {
 
         guard let path =
@@ -138,7 +127,6 @@ class HomeViewController: UIViewController {
                     ofType: "mp4"
                 )
         else {
-
             print("videoHome.mp4 not found")
             return
         }
@@ -153,14 +141,11 @@ class HomeViewController: UIViewController {
 
         playerLayer?.frame = namasteVideo.bounds
 
-        // Remove old player layers
         namasteVideo.layer.sublayers?
             .filter { $0 is AVPlayerLayer }
             .forEach { $0.removeFromSuperlayer() }
 
-        // Add new layer
         if let playerLayer = playerLayer {
-
             namasteVideo.layer.addSublayer(playerLayer)
         }
 
@@ -169,13 +154,11 @@ class HomeViewController: UIViewController {
         player?.play()
     }
 
-
     func setupCardGestures() {
 
         videoimageView.isUserInteractionEnabled = true
         audioimageView.isUserInteractionEnabled = true
 
-        // Video Tap
         let videoTap = UITapGestureRecognizer(
             target: self,
             action: #selector(videoCardTapped)
@@ -183,7 +166,6 @@ class HomeViewController: UIViewController {
 
         videoimageView.addGestureRecognizer(videoTap)
 
-        // Audio Tap
         let audioTap = UITapGestureRecognizer(
             target: self,
             action: #selector(audioCardTapped)
@@ -191,7 +173,6 @@ class HomeViewController: UIViewController {
 
         audioimageView.addGestureRecognizer(audioTap)
     }
-
 
     @objc func videoCardTapped() {
 
@@ -227,9 +208,7 @@ class HomeViewController: UIViewController {
         )
     }
 
-
     deinit {
-
         NotificationCenter.default.removeObserver(self)
     }
 }

@@ -1,147 +1,188 @@
-//
-//  signUpViewController.swift
-//  signVaani
-//
-//  Created by Shreya Bhardwaj on 27/03/26.
-//
-
 import UIKit
 
-class signUpViewController: UIViewController {
+class signUpViewController: UIViewController, AvatarSelectionDelegate {
 
     // MARK: - OUTLETS
-    @IBOutlet weak var bigView: UIView!
-    @IBOutlet weak var userNameView: UIView!
-    @IBOutlet weak var genderView: UIView!
-    @IBOutlet weak var dobView: UIView!
-    @IBOutlet weak var nameTextField: UITextField!
-    @IBOutlet weak var genderSegment: UISegmentedControl!
-    @IBOutlet weak var dobPicker: UIDatePicker!
-    @IBOutlet weak var saveButton: UIButton!
 
-    // MARK: - VIEW DID LOAD
+    @IBOutlet weak var profileImageChange: UIButton!
+    @IBOutlet weak var innerView: UIView!
+    @IBOutlet weak var outerView: UIView!
+    @IBOutlet weak var bigView: UIView!
+    @IBOutlet weak var profileImageView: UIImageView!
+    @IBOutlet weak var nameTextField: UITextField!
+    @IBOutlet weak var continueButton: UIButton!
+
+    // MARK: - VIEW LIFE CYCLE
+
     override func viewDidLoad() {
         super.viewDidLoad()
+        navigationItem.hidesBackButton = true
+        navigationController?.interactivePopGestureRecognizer?.isEnabled = false
         setupUI()
         loadSavedProfile()
-        let tap = UITapGestureRecognizer(
-                    target: self,
-                    action: #selector(dismissKeyboard)
-                )
 
-                view.addGestureRecognizer(tap)
+        profileImageChange.addTarget(
+            self,
+            action: #selector(profileImageChangeButtonTapped),
+            for: .touchUpInside
+        )
+
+        continueButton.addTarget(
+            self,
+            action: #selector(continueButtonPressed),
+            for: .touchUpInside
+        )
+
+        let tapGesture = UITapGestureRecognizer(
+            target: self,
+            action: #selector(dismissKeyboard)
+        )
+
+        view.addGestureRecognizer(tapGesture)
     }
-    
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
-    @objc func dismissKeyboard() {
-            view.endEditing(true)
-        }
-    // MARK: - VIEW DID LAYOUT
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        setupGradient()
-    }
 
-    // MARK: - UI SETUP
-    func setupUI() {
+    
+
+    // MARK: - UI
+
+    private func setupUI() {
+
+        title = "Create Your Profile"
+
         bigView.layer.cornerRadius = 20
-        userNameView.layer.cornerRadius = 12
-        genderView.layer.cornerRadius = 12
-        dobView.layer.cornerRadius = 12
-        saveButton.layer.cornerRadius = 12
-        
-        dobPicker.datePickerMode = .date
-        dobPicker.maximumDate = Date()
-        genderSegment.selectedSegmentIndex = 0
+
+        outerView.layer.cornerRadius = outerView.frame.height / 2
+           innerView.layer.cornerRadius = innerView.frame.height / 2
+
+        profileImageChange.layer.cornerRadius = 18
+        profileImageChange.clipsToBounds = true
+
+        continueButton.layer.cornerRadius = 12
+        profileImageView.layer.cornerRadius =
+            profileImageView.frame.width / 2
+
+        profileImageView.clipsToBounds = true
+        nameTextField.layer.cornerRadius = 12
+        nameTextField.layer.borderWidth = 1
+        nameTextField.layer.borderColor = UIColor.systemGray4.cgColor
     }
 
-    // MARK: - GRADIENT
-    func setupGradient() {
-        view.layer.sublayers?.removeAll { $0.name == "gradientLayer" }
-        
-        let gradient = CAGradientLayer()
-        gradient.name = "gradientLayer"
-        gradient.colors = [
-            UIColor(red: 234/255, green: 242/255, blue: 255/255, alpha: 1).cgColor,
-            UIColor(red: 163/255, green: 198/255, blue: 255/255, alpha: 1).cgColor
-        ]
-        gradient.locations = [0.0, 0.7]
-        gradient.startPoint = CGPoint(x: 0.5, y: 0.0)
-        gradient.endPoint = CGPoint(x: 0.5, y: 1.0)
-        gradient.frame = view.bounds
-        view.layer.insertSublayer(gradient, at: 0)
+    // MARK: - PROFILE IMAGE
+
+    @objc private func profileImageChangeButtonTapped() {
+
+        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+
+        guard let imageVC = storyboard.instantiateViewController(
+            withIdentifier: "ImageViewController"
+        ) as? ImageViewController else {
+
+            print("ImageViewController not found")
+            return
+        }
+
+        imageVC.delegate = self
+
+        present(imageVC, animated: true)
     }
 
-    // MARK: - CONTINUE BUTTON
-    @IBAction func saveButtonTapped(_ sender: UIButton) {
-        let name = nameTextField.text ?? ""
-        
-        // Validate inputs
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
+    func didSelectAvatar(image: UIImage) {
+
+        profileImageView.image = image
+
+        if let imageData = image.pngData() {
+            UserDefaults.standard.set(
+                imageData,
+                forKey: "userAvatar"
+            )
+        }
+    }
+
+    // MARK: - CONTINUE
+
+    @objc private func continueButtonPressed() {
+
+        let name = nameTextField.text?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        guard !name.isEmpty else {
             showAlert(message: "Please enter your name")
             return
         }
-        
-        let gender = genderSegment.titleForSegment(at: genderSegment.selectedSegmentIndex) ?? ""
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd/MM/yyyy"
-        let dobString = formatter.string(from: dobPicker.date)
-        
-        // SAVE USER DATA
+
         UserDefaults.standard.set(name, forKey: "userName")
-        UserDefaults.standard.set(gender, forKey: "userGender")
-        UserDefaults.standard.set(dobString, forKey: "userDOB")
-        
-        // MARK SIGNUP AS COMPLETED
+
+        // Important flag used by SceneDelegate
         UserDefaults.standard.set(true, forKey: "hasCompletedSignup")
         UserDefaults.standard.synchronize()
-        
-        print("SIGNUP COMPLETED: \(UserDefaults.standard.bool(forKey: "hasCompletedSignup"))")
-        
-        // Replace the entire navigation stack and go to Home
+
+        print(
+            "hasCompletedSignup = \(UserDefaults.standard.bool(forKey: "hasCompletedSignup"))"
+        )
+
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
-        let homeVC = storyboard.instantiateViewController(withIdentifier: "HomeViewController")
-        
-        // This completely replaces the root view controller using a scene-aware approach
-        if let window = self.view.window ?? (UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first(where: { $0.isKeyWindow })) {
-            window.rootViewController = UINavigationController(rootViewController: homeVC)
+
+        let homeVC = storyboard.instantiateViewController(
+            withIdentifier: "HomeViewController"
+        )
+
+        if let window = self.view.window ??
+            UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .flatMap({ $0.windows })
+                .first(where: { $0.isKeyWindow }) {
+
+            window.rootViewController =
+                UINavigationController(rootViewController: homeVC)
+
             window.makeKeyAndVisible()
         }
     }
-    
-    // MARK: - LOAD SAVED PROFILE
-    func loadSavedProfile() {
-        nameTextField.text = UserDefaults.standard.string(forKey: "userName")
-        
-        let savedGender = UserDefaults.standard.string(forKey: "userGender")
-        if savedGender == "Male" {
-            genderSegment.selectedSegmentIndex = 0
-        } else if savedGender == "Female" {
-            genderSegment.selectedSegmentIndex = 1
-        } else if savedGender == "Other" {
-            genderSegment.selectedSegmentIndex = 2
-        }
-        
-        if let dob = UserDefaults.standard.string(forKey: "userDOB") {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "dd/MM/yyyy"
-            if let date = formatter.date(from: dob) {
-                dobPicker.date = date
-            }
+
+    // MARK: - LOAD DATA
+
+    private func loadSavedProfile() {
+
+        nameTextField.text =
+            UserDefaults.standard.string(forKey: "userName")
+
+        if let imageData = UserDefaults.standard.data(
+            forKey: "userAvatar"
+        ) {
+
+            profileImageView.image =
+                UIImage(data: imageData)
         }
     }
-    
-    func showAlert(message: String) {
-        let alert = UIAlertController(title: "Info", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+
+    // MARK: - KEYBOARD
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+
+    // MARK: - ALERT
+
+    private func showAlert(message: String) {
+
+        let alert = UIAlertController(
+            title: "Info",
+            message: message,
+            preferredStyle: .alert
+        )
+
+        alert.addAction(
+            UIAlertAction(
+                title: "OK",
+                style: .default
+            )
+        )
+
         present(alert, animated: true)
     }
 }
-

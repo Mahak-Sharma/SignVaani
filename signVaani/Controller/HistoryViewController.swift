@@ -1,6 +1,7 @@
 import UIKit
 import PhotosUI
 import AVFoundation
+internal import Speech
 
 class HistoryViewController: UIViewController {
   
@@ -49,6 +50,7 @@ class HistoryViewController: UIViewController {
     }
 
     var selectedVideo: VideoItem?
+    private var activeProcessingAlert: UIAlertController?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -277,154 +279,390 @@ class HistoryViewController: UIViewController {
     
     private func checkVideoDuration(from url: URL) {
         let asset = AVURLAsset(url: url)
-
+        
         Task { [weak self] in
             guard let self = self else { return }
-
-            // Check audio first
-            let hasAudio = await checkVideoHasAudio(asset)
-
-            if !hasAudio {
-                await MainActor.run {
-                    self.showNoAudioAlert()
-                }
-                return
-            }
-
+            
             do {
                 let loadedDuration = try await asset.load(.duration)
                 let seconds = loadedDuration.seconds
-
-                await MainActor.run {
-                    if seconds > 60 {
-                        self.showLongVideoAlert()
-                    } else {
-                        self.proceedWithVideoUpload(from: url, duration: seconds)
+                
+                guard seconds > 0 && !seconds.isNaN && !seconds.isInfinite else {
+                    try? FileManager.default.removeItem(at: url)
+                    await MainActor.run {
+                        self.activeProcessingAlert?.dismiss(animated: false) {
+                            self.showErrorAlert(message: "Could not determine video duration.")
+                        }
                     }
+                    return
                 }
+                
+                print("Video duration:", seconds)
 
+                if seconds > 60 {
+                    print("LONG VIDEO DETECTED")
+                    try? FileManager.default.removeItem(at: url)
+                    await MainActor.run {
+                        self.activeProcessingAlert?.dismiss(animated: false) {
+                            self.showLongVideoAlert()
+                        }
+                    }
+                    return
+                }
+                
+                let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+                var hasActualAudio = false
+                if !audioTracks.isEmpty {
+                    hasActualAudio = await self.checkVideoHasActualAudio(url)
+                }
+                
+                await MainActor.run {
+                    guard hasActualAudio else {
+                        try? FileManager.default.removeItem(at: url)
+                        self.activeProcessingAlert?.dismiss(animated: false) {
+                            self.showNoSpeechAlert()
+                        }
+                        return
+                    }
+
+                    print("NORMAL VIDEO")
+                    self.checkForSpeech(in: url, duration: seconds)
+                }
+                
             } catch {
                 await MainActor.run {
-                    self.showErrorAlert(message: "Failed to read video duration.")
+                    try? FileManager.default.removeItem(at: url)
+                    self.activeProcessingAlert?.dismiss(animated: false) {
+                        self.showErrorAlert(message: "Failed to read video: \(error.localizedDescription)")
+                    }
                 }
             }
         }
     }
-    
-    private func checkVideoHasAudio(_ asset: AVAsset) async -> Bool {
-        do {
-            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
-            return !audioTracks.isEmpty
-        } catch {
+    // MARK: - Speech Detection
+    private func checkForSpeech(in url: URL, duration: Double) {
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            guard let self = self else { return }
+            
+            guard status == .authorized else {
+                DispatchQueue.main.async {
+                    self.activeProcessingAlert?.dismiss(animated: false) {
+                        self.proceedWithVideoUpload(from: url, duration: duration)
+                    }
+                }
+                return
+            }
+            
+            guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-IN")),
+                  recognizer.isAvailable else {
+                DispatchQueue.main.async {
+                    self.activeProcessingAlert?.dismiss(animated: false) {
+                        self.proceedWithVideoUpload(from: url, duration: duration)
+                    }
+                }
+                return
+            }
+            
+            guard let exportSession = AVAssetExportSession(
+                asset: AVURLAsset(url: url),
+                presetName: AVAssetExportPresetAppleM4A
+            ) else {
+                DispatchQueue.main.async {
+                    self.activeProcessingAlert?.dismiss(animated: false) {
+                        self.proceedWithVideoUpload(from: url, duration: duration)
+                    }
+                }
+                return
+            }
+            
+            let tempAudioURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString + "_check_speech.m4a")
+            try? FileManager.default.removeItem(at: tempAudioURL)
+            
+            let targetDuration = min(duration, 15.0)
+            exportSession.timeRange = CMTimeRange(
+                start: .zero,
+                duration: CMTime(seconds: targetDuration, preferredTimescale: 600)
+            )
+            
+            class SpeechCheckTracker {
+                var isCompleted = false
+            }
+            let tracker = SpeechCheckTracker()
+            
+            var recognitionTask: SFSpeechRecognitionTask? = nil
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                if !tracker.isCompleted {
+                    tracker.isCompleted = true
+                    recognitionTask?.cancel()
+                    try? FileManager.default.removeItem(at: tempAudioURL)
+                    self.activeProcessingAlert?.dismiss(animated: false) {
+                        self.proceedWithVideoUpload(from: url, duration: duration)
+                    }
+                }
+            }
+            
+            Task {
+                do {
+                    try await exportSession.export(to: tempAudioURL, as: .m4a)
+                    
+                    let request = SFSpeechURLRecognitionRequest(url: tempAudioURL)
+                    request.shouldReportPartialResults = false
+                    request.requiresOnDeviceRecognition = false
+                    
+                    let task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                        guard let self = self else {
+                            try? FileManager.default.removeItem(at: tempAudioURL)
+                            return
+                        }
+                        
+                        if let error = error {
+                            if !tracker.isCompleted {
+                                tracker.isCompleted = true
+                                try? FileManager.default.removeItem(at: tempAudioURL)
+                                DispatchQueue.main.async {
+                                    self.activeProcessingAlert?.dismiss(animated: false) {
+                                        let nsError = error as NSError
+                                        if nsError.code == 1110 {
+                                            try? FileManager.default.removeItem(at: url)
+                                            self.showNoSpeechAlert()
+                                        } else {
+                                            self.proceedWithVideoUpload(from: url, duration: duration)
+                                        }
+                                    }
+                                }
+                            }
+                            return
+                        }
+                        
+                        if let result = result, result.isFinal {
+                            if !tracker.isCompleted {
+                                tracker.isCompleted = true
+                                try? FileManager.default.removeItem(at: tempAudioURL)
+                                DispatchQueue.main.async {
+                                    self.activeProcessingAlert?.dismiss(animated: false) {
+                                        let transcript = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespaces)
+                                        if transcript.isEmpty {
+                                            try? FileManager.default.removeItem(at: url)
+                                            self.showNoSpeechAlert()
+                                        } else {
+                                            self.proceedWithVideoUpload(from: url, duration: duration)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    await MainActor.run {
+                        if !tracker.isCompleted {
+                            recognitionTask = task
+                        } else {
+                            task.cancel()
+                        }
+                    }
+                    
+                } catch {
+                    try? FileManager.default.removeItem(at: tempAudioURL)
+                    await MainActor.run {
+                        if !tracker.isCompleted {
+                            tracker.isCompleted = true
+                            self.activeProcessingAlert?.dismiss(animated: false) {
+                                self.proceedWithVideoUpload(from: url, duration: duration)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    private func checkVideoHasActualAudio(_ url: URL) async -> Bool {
+        let asset = AVURLAsset(url: url)
+        
+        // Step 1: Check audio track exists
+        guard let audioTrack = try? await asset.loadTracks(withMediaType: .audio).first else {
             return false
+        }
+        
+        guard let reader = try? AVAssetReader(asset: asset) else {
+            return true // Assume audio if we can't read
+        }
+        
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false
+        ]
+        
+        let output = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: settings)
+        output.alwaysCopiesSampleData = false
+        
+        guard reader.canAdd(output) else { return true }
+        reader.add(output)
+        
+        // Read more — 10 seconds to be safe
+        reader.timeRange = CMTimeRange(
+            start: .zero,
+            duration: CMTime(seconds: 5, preferredTimescale: 44100)
+        )
+        
+        guard reader.startReading() else { return true }
+        
+        nonisolated(unsafe) let capturedOutput = output
+        nonisolated(unsafe) let capturedReader = reader
+        
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                
+                let threshold: Float = 0.0005 // Lowered threshold
+                var foundSound = false
+                var totalSamplesChecked = 0
+                let maxSamples = 44100 * 10 // 10 seconds worth
+                
+                while !foundSound,
+                      totalSamplesChecked < maxSamples,
+                      let sampleBuffer = capturedOutput.copyNextSampleBuffer() {
+                    
+                    guard let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else {
+                        continue
+                    }
+                    
+                    let totalLength = CMBlockBufferGetDataLength(blockBuffer)
+                    guard totalLength > 0 else { continue }
+                    
+                    var contiguousBuffer: CMBlockBuffer?
+                    // ✅ Force contiguous memory — THIS is the key fix
+                    guard CMBlockBufferCreateContiguous(
+                        allocator: nil,
+                        sourceBuffer: blockBuffer,
+                        blockAllocator: nil,
+                        customBlockSource: nil,
+                        offsetToData: 0,
+                        dataLength: totalLength,
+                        flags: 0,
+                        blockBufferOut: &contiguousBuffer
+                    ) == noErr, let contiguous = contiguousBuffer else { continue }
+                    
+                    var dataPointer: UnsafeMutablePointer<Int8>?
+                    var dataLength = 0
+                    
+                    guard CMBlockBufferGetDataPointer(
+                        contiguous,
+                        atOffset: 0,
+                        lengthAtOffsetOut: nil,
+                        totalLengthOut: &dataLength,
+                        dataPointerOut: &dataPointer
+                    ) == noErr, let pointer = dataPointer else { continue }
+                    
+                    let sampleCount = dataLength / 4 // Float32 = 4 bytes
+                    guard sampleCount > 0 else { continue }
+                    
+                    // ✅ Direct pointer access — no copy needed, guaranteed contiguous
+                    let floatPointer = UnsafeRawPointer(pointer)
+                        .bindMemory(to: Float32.self, capacity: sampleCount)
+                    let floatBuffer = UnsafeBufferPointer(start: floatPointer, count: sampleCount)
+                    
+                    // Calculate RMS
+                    var sumOfSquares: Float = 0
+                    for sample in floatBuffer {
+                        sumOfSquares += sample * sample
+                    }
+                    let rms = sqrt(sumOfSquares / Float(sampleCount))
+                    
+                    if rms > threshold {
+                        foundSound = true
+                    }
+                    
+                    totalSamplesChecked += sampleCount
+                }
+                
+                capturedReader.cancelReading()
+                continuation.resume(returning: foundSound)
+            }
         }
     }
     
-    private func showNoAudioAlert() {
+    // MARK: - Alerts
+
+    private func showNoSpeechAlert() {
         let alert = UIAlertController(
-            title: "No Audio Found",
-            message: "The selected video does not contain audio. Please choose another video.",
+            title: "No Speech Detected",
+            message: "The selected video does not contain any speech. Please choose a video with someone speaking.",
             preferredStyle: .alert
         )
-
         alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { [weak self] _ in
             self?.addVideoTapped(self?.addVideo ?? UIButton())
         })
-
-        alert.addAction(UIAlertAction(title: "Cancel", style: .destructive))
-
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
     }
-    
+
     private func showLongVideoAlert() {
         let alert = UIAlertController(
             title: "Video Too Long",
-            message: "Please select a video shorter than 1 minute. Your video exceeds the time limit.",
+            message: "Please select a video shorter than 1 minute.",
             preferredStyle: .alert
         )
-        
         alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { [weak self] _ in
             self?.addVideoTapped(self?.addVideo ?? UIButton())
         })
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .destructive))
-        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
     }
-    
-    private func proceedWithVideoUpload(from sourceURL: URL, duration: Double) {
-        let fileName = UUID().uuidString + ".mov"
-        let destinationURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(fileName)
 
-        do {
-            // Check if file already exists and remove it
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-            
-            // Copy the video file
-            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
-            
-            let alert = UIAlertController(
-                title: "Video Confirmation",
-                message: String(format: "Video duration: %.1f seconds\n\nAre you sure you want to upload this video?", duration),
-                preferredStyle: .alert
-            )
-            
-            alert.addAction(UIAlertAction(title: "Proceed", style: .default) { [weak self] _ in
-                guard let self = self else { return }
-                
-                let newVideo = VideoItem(
-                    id: UUID().uuidString,
-                    title: "New Video",
-                    thumbnail: "thumbnail",
-                    videoPath: destinationURL.path,
-                    duration: duration,
-                    createdAt: Date()
-                )
-
-                HistoryManager.shared.addVideo(newVideo)
-                
-                if self.isSearching {
-                    self.hideSearchBar()
-                }
-                
-                self.collectionView.reloadData()
-                self.updateEmptyState()
-                self.selectedVideo = newVideo
-                self.performSegue(withIdentifier: "goToPlayer", sender: self)
-            })
-            
-            alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { [weak self] _ in
-                // Delete the copied file if user chooses another video
-                try? FileManager.default.removeItem(at: destinationURL)
-                // Reopen picker
-                guard let self = self else { return }
-                self.addVideoTapped(self.addVideo)
-            })
-            
-            alert.addAction(UIAlertAction(title: "Cancel", style: .destructive) { _ in
-                // Clean up the copied file
-                try? FileManager.default.removeItem(at: destinationURL)
-            })
-            
-            self.present(alert, animated: true)
-            
-        } catch {
-            showErrorAlert(message: "Failed to save video: \(error.localizedDescription)")
-        }
-    }
-    
     private func showErrorAlert(message: String) {
-        let alert = UIAlertController(
-            title: "Error",
-            message: message,
-            preferredStyle: .alert
-        )
+        let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
+    
+    // MARK: - proceedWithVideoUpload
+
+    private func proceedWithVideoUpload(from localURL: URL, duration: Double) {
+        let alert = UIAlertController(
+            title: "Video Confirmation",
+            message: String(format: "Duration: %.1f seconds\n\nProceed with this video?", duration),
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Proceed", style: .default) { [weak self] _ in
+            guard let self = self else { return }
+            
+            let newVideo = VideoItem(
+                id: UUID().uuidString,
+                title: "New Video",
+                thumbnail: "thumbnail",
+                videoPath: localURL.path,
+                duration: duration,
+                createdAt: Date()
+            )
+            
+            HistoryManager.shared.addVideo(newVideo)
+            
+            if self.isSearching { self.hideSearchBar() }
+            
+            self.collectionView.reloadData()
+            self.updateEmptyState()
+            self.selectedVideo = newVideo
+            self.performSegue(withIdentifier: "goToPlayer", sender: self)
+        })
+        
+        alert.addAction(UIAlertAction(title: "Choose Another Video", style: .default) { [weak self] _ in
+            try? FileManager.default.removeItem(at: localURL)
+            self?.addVideoTapped(self?.addVideo ?? UIButton())
+        })
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .destructive) { _ in
+            try? FileManager.default.removeItem(at: localURL)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+
 }
 
 // MARK: - Collection DataSource
@@ -554,63 +792,88 @@ extension HistoryViewController: UISearchBarDelegate {
 }
 
 // MARK: - PHPickerViewControllerDelegate
+
 extension HistoryViewController: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-        picker.dismiss(animated: true)
-
-        guard let itemProvider = results.first?.itemProvider else { return }
-
-        if itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
-            // Use the modern API to load the video
-            itemProvider.loadItem(forTypeIdentifier: UTType.movie.identifier, options: nil) { [weak self] (item, error) in
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
-                    
-                    if let error = error {
+        picker.dismiss(animated: true) { [weak self] in
+            guard let self = self else { return }
+            
+            // Show processing alert immediately as picker dismisses
+            let processingAlert = UIAlertController(
+                title: nil,
+                message: "Processing video...",
+                preferredStyle: .alert
+            )
+            let indicator = UIActivityIndicatorView(style: .medium)
+            indicator.startAnimating()
+            indicator.translatesAutoresizingMaskIntoConstraints = false
+            processingAlert.view.addSubview(indicator)
+            NSLayoutConstraint.activate([
+                indicator.centerXAnchor.constraint(equalTo: processingAlert.view.centerXAnchor),
+                indicator.bottomAnchor.constraint(equalTo: processingAlert.view.bottomAnchor, constant: -16)
+            ])
+            self.activeProcessingAlert = processingAlert
+            self.present(processingAlert, animated: true)
+            
+            guard let itemProvider = results.first?.itemProvider else { return }
+            
+            // Try movie type identifiers in order of preference
+            let typeIdentifiers = [
+                UTType.movie.identifier,
+                UTType.video.identifier,
+                UTType.mpeg4Movie.identifier,
+                "com.apple.quicktime-movie"
+            ]
+            
+            let matchedType = typeIdentifiers.first {
+                itemProvider.hasItemConformingToTypeIdentifier($0)
+            }
+            
+            guard let typeIdentifier = matchedType else {
+                self.showErrorAlert(message: "Unsupported video format.")
+                return
+            }
+            
+            itemProvider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { [weak self] tempURL, error in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    DispatchQueue.main.async {
                         self.showErrorAlert(message: "Failed to load video: \(error.localizedDescription)")
-                        return
                     }
-                    
-                    // Handle both URL and Data cases
-                    if let url = item as? URL {
-                        // Create a temporary copy since the original might be inaccessible
-                        self.processVideoFromURL(url)
-                    } else if let data = item as? Data {
-                        // Save data to temporary file
-                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
-                        do {
-                            try data.write(to: tempURL)
-                            self.processVideoFromURL(tempURL)
-                        } catch {
-                            self.showErrorAlert(message: "Failed to process video data")
-                        }
-                    } else {
-                        self.showErrorAlert(message: "Unsupported video format")
+                    return
+                }
+                
+                guard let tempURL = tempURL else {
+                    DispatchQueue.main.async {
+                        self.showErrorAlert(message: "Could not access video file.")
                     }
+                    return
+                }
+                
+                // ✅ Copy SYNCHRONOUSLY here — tempURL is only valid inside this callback
+                let fileName = UUID().uuidString + "." + tempURL.pathExtension
+                let destinationURL = FileManager.default.urls(
+                    for: .documentDirectory, in: .userDomainMask
+                )[0].appendingPathComponent(fileName)
+                
+                do {
+                    if FileManager.default.fileExists(atPath: destinationURL.path) {
+                        try FileManager.default.removeItem(at: destinationURL)
+                    }
+                    // Must copy here before callback returns
+                    try FileManager.default.copyItem(at: tempURL, to: destinationURL)
+                } catch {
+                    DispatchQueue.main.async {
+                        self.showErrorAlert(message: "Failed to save video: \(error.localizedDescription)")
+                    }
+                    return
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.checkVideoDuration(from: destinationURL)
                 }
             }
-        }
-    }
-    
-    private func processVideoFromURL(_ url: URL) {
-        // Create a permanent copy in our app's directory
-        let fileName = UUID().uuidString + ".mov"
-        let destinationURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(fileName)
-        
-        do {
-            // Remove if exists
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-            
-            // Copy the file
-            try FileManager.default.copyItem(at: url, to: destinationURL)
-            
-            // Now check duration on our local copy
-            checkVideoDuration(from: destinationURL)
-        } catch {
-            showErrorAlert(message: "Failed to save video: \(error.localizedDescription)")
         }
     }
 }

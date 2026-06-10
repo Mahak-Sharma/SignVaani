@@ -11,10 +11,10 @@ class LiveViewController: UIViewController, WKNavigationDelegate, WKScriptMessag
     @IBOutlet weak var captionLabel: UILabel!
     @IBOutlet weak var outerView: UIView!
     @IBOutlet weak var micButton: UIButton!
-
     @IBOutlet weak var restartButton: UIButton!
     @IBOutlet weak var playPauseButton: UIButton!
     var incomingVideoURL: URL?
+    var processingAlert: UIAlertController?
 
     // Speech Recognition
     let glossProcessor = GlossProcessor()
@@ -46,6 +46,7 @@ class LiveViewController: UIViewController, WKNavigationDelegate, WKScriptMessag
     var isListening = false
     var isAvatarAnimating = false
     var isAvatarPaused = false
+    var hasProcessedIncomingVideo = false
 
 
     override func viewDidLoad() {
@@ -60,18 +61,42 @@ class LiveViewController: UIViewController, WKNavigationDelegate, WKScriptMessag
         recordView.layer.cornerRadius = 6
         outerView.layer.cornerRadius = 25
         outerView.clipsToBounds = true
-
-        if let videoURL = incomingVideoURL {
-            micButton.isHidden = true
-            recordView.isHidden = true
-            captionLabel.text = "Extracting audio..."
-            extractAndProcess(videoURL: videoURL)
-        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        if let videoURL = incomingVideoURL, !hasProcessedIncomingVideo {
+            hasProcessedIncomingVideo = true
+            
+            micButton.isHidden = true
+            recordView.isHidden = true
+            
+            // Show processing dialog box
+            let alert = UIAlertController(
+                title: nil,
+                message: "Processing video...",
+                preferredStyle: .alert
+            )
+            let indicator = UIActivityIndicatorView(style: .medium)
+            indicator.startAnimating()
+            indicator.translatesAutoresizingMaskIntoConstraints = false
+            alert.view.addSubview(indicator)
+            NSLayoutConstraint.activate([
+                indicator.centerXAnchor.constraint(equalTo: alert.view.centerXAnchor),
+                indicator.bottomAnchor.constraint(equalTo: alert.view.bottomAnchor, constant: -16)
+            ])
+            self.processingAlert = alert
+            present(alert, animated: true)
+            
+            captionLabel.text = "Extracting audio..."
+            extractAndProcess(videoURL: videoURL)
+        }
     }
 
     override func viewDidLayoutSubviews() {

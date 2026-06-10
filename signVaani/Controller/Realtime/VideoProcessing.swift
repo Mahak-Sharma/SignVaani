@@ -16,6 +16,7 @@ extension LiveViewController {
             asset: AVURLAsset(url: videoURL),
             presetName: AVAssetExportPresetAppleM4A
         ) else {
+            self.processingAlert?.dismiss(animated: true)
             captionLabel.text = "Error: Could not process video"; return
         }
 
@@ -27,11 +28,15 @@ extension LiveViewController {
             do {
                 try await exportSession.export(to: audioURL, as: .m4a)
                 await MainActor.run {
+                    self.processingAlert?.message = "Recognizing speech..."
                     self.captionLabel.text = "Recognizing speech..."
                     self.recognizeAudioFile(url: audioURL)
                 }
             } catch {
-                await MainActor.run { self.captionLabel.text = "Error extracting audio" }
+                await MainActor.run {
+                    self.processingAlert?.dismiss(animated: true)
+                    self.captionLabel.text = "Error extracting audio"
+                }
             }
         }
     }
@@ -40,7 +45,10 @@ extension LiveViewController {
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             guard let self else { return }
             guard status == .authorized else {
-                DispatchQueue.main.async { self.captionLabel.text = "Speech permission denied" }
+                DispatchQueue.main.async {
+                    self.processingAlert?.dismiss(animated: true)
+                    self.captionLabel.text = "Speech permission denied"
+                }
                 return
             }
             let request = SFSpeechURLRecognitionRequest(url: url)
@@ -50,12 +58,18 @@ extension LiveViewController {
             self.speechRecognizer?.recognitionTask(with: request) { [weak self] result, error in
                 guard let self else { return }
                 if error != nil {
-                    DispatchQueue.main.async { self.captionLabel.text = "Recognition failed" }
+                    DispatchQueue.main.async {
+                        self.processingAlert?.dismiss(animated: true)
+                        self.captionLabel.text = "Recognition failed"
+                    }
                     return
                 }
                 guard let result, result.isFinal else { return }
                 self.pendingSegments = result.bestTranscription.segments
-                DispatchQueue.main.async { self.interpretAndShowCaption() }
+                DispatchQueue.main.async {
+                    self.processingAlert?.dismiss(animated: true)
+                    self.interpretAndShowCaption()
+                }
             }
         }
     }
