@@ -7,12 +7,6 @@
 
 import UIKit
 
-//text field delegate is used to manipulate the text present in the text field
-//(used in username text field, which will be hidden.)
-
-//avatar selection delegate : this is a custom protocol used to set
-//the user pfp by selecting from the given pre loaded images
-
 class ProfileController: UIViewController,
                          AvatarSelectionDelegate {
 
@@ -77,7 +71,7 @@ class ProfileController: UIViewController,
            let savedImage = UIImage(data: data) {
             profileImage.image = savedImage
         } else {
-            profileImage.image = UIImage(named: "3247bef7-b265-43c2-9220-77f64bcec0d4")
+            profileImage.image = UIImage(named: "man profile")
         }
     }
 

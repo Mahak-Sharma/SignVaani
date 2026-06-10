@@ -339,7 +339,7 @@ class HistoryViewController: UIViewController {
             }
         }
     }
-    // MARK: - Speech Detection
+    //Speech Detection
     private func checkForSpeech(in url: URL, duration: Double) {
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             guard let self = self else { return }
@@ -480,7 +480,7 @@ class HistoryViewController: UIViewController {
     private func checkVideoHasActualAudio(_ url: URL) async -> Bool {
         let asset = AVURLAsset(url: url)
         
-        // Step 1: Check audio track exists
+        //Check audio track exists
         guard let audioTrack = try? await asset.loadTracks(withMediaType: .audio).first else {
             return false
         }
@@ -502,8 +502,6 @@ class HistoryViewController: UIViewController {
         
         guard reader.canAdd(output) else { return true }
         reader.add(output)
-        
-        // Read more — 10 seconds to be safe
         reader.timeRange = CMTimeRange(
             start: .zero,
             duration: CMTime(seconds: 5, preferredTimescale: 44100)
@@ -534,7 +532,6 @@ class HistoryViewController: UIViewController {
                     guard totalLength > 0 else { continue }
                     
                     var contiguousBuffer: CMBlockBuffer?
-                    // ✅ Force contiguous memory — THIS is the key fix
                     guard CMBlockBufferCreateContiguous(
                         allocator: nil,
                         sourceBuffer: blockBuffer,
@@ -560,7 +557,6 @@ class HistoryViewController: UIViewController {
                     let sampleCount = dataLength / 4 // Float32 = 4 bytes
                     guard sampleCount > 0 else { continue }
                     
-                    // ✅ Direct pointer access — no copy needed, guaranteed contiguous
                     let floatPointer = UnsafeRawPointer(pointer)
                         .bindMemory(to: Float32.self, capacity: sampleCount)
                     let floatBuffer = UnsafeBufferPointer(start: floatPointer, count: sampleCount)
@@ -585,8 +581,7 @@ class HistoryViewController: UIViewController {
         }
     }
     
-    // MARK: - Alerts
-
+    //Alerts
     private func showNoSpeechAlert() {
         let alert = UIAlertController(
             title: "No Speech Detected",
@@ -619,8 +614,7 @@ class HistoryViewController: UIViewController {
         present(alert, animated: true)
     }
     
-    // MARK: - proceedWithVideoUpload
-
+    //proceedWithVideoUpload
     private func proceedWithVideoUpload(from localURL: URL, duration: Double) {
         let alert = UIAlertController(
             title: "Video Confirmation",
@@ -665,7 +659,7 @@ class HistoryViewController: UIViewController {
 
 }
 
-// MARK: - Collection DataSource
+//Collection DataSource
 extension HistoryViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView,
                         numberOfItemsInSection section: Int) -> Int {
@@ -756,7 +750,7 @@ extension HistoryViewController: UICollectionViewDataSource {
     }
 }
 
-// MARK: - Collection Delegate
+//Collection Delegate
 extension HistoryViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView,
                         didSelectItemAt indexPath: IndexPath) {
@@ -765,7 +759,7 @@ extension HistoryViewController: UICollectionViewDelegate {
     }
 }
 
-// MARK: - UISearchBarDelegate
+//UISearchBarDelegate
 extension HistoryViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         filterContentForSearchText(searchText)
@@ -791,14 +785,12 @@ extension HistoryViewController: UISearchBarDelegate {
     }
 }
 
-// MARK: - PHPickerViewControllerDelegate
-
+//PHPickerViewControllerDelegate
 extension HistoryViewController: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true) { [weak self] in
             guard let self = self else { return }
             
-            // Show processing alert immediately as picker dismisses
             let processingAlert = UIAlertController(
                 title: nil,
                 message: "Processing video...",
@@ -817,7 +809,6 @@ extension HistoryViewController: PHPickerViewControllerDelegate {
             
             guard let itemProvider = results.first?.itemProvider else { return }
             
-            // Try movie type identifiers in order of preference
             let typeIdentifiers = [
                 UTType.movie.identifier,
                 UTType.video.identifier,
@@ -850,8 +841,7 @@ extension HistoryViewController: PHPickerViewControllerDelegate {
                     }
                     return
                 }
-                
-                // ✅ Copy SYNCHRONOUSLY here — tempURL is only valid inside this callback
+            
                 let fileName = UUID().uuidString + "." + tempURL.pathExtension
                 let destinationURL = FileManager.default.urls(
                     for: .documentDirectory, in: .userDomainMask
@@ -861,7 +851,6 @@ extension HistoryViewController: PHPickerViewControllerDelegate {
                     if FileManager.default.fileExists(atPath: destinationURL.path) {
                         try FileManager.default.removeItem(at: destinationURL)
                     }
-                    // Must copy here before callback returns
                     try FileManager.default.copyItem(at: tempURL, to: destinationURL)
                 } catch {
                     DispatchQueue.main.async {
