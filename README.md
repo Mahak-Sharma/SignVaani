@@ -36,7 +36,6 @@ Being a part of the iOS Development Center, powered by Apple and Infosys in our 
 We all, as a team tried to keep our focus on identifying problems and struggles faced by students, as us being students, we can identify and work on those issues proactively. As we were remembering our own experiences, one incident highlighted the way to our problem statement. There was of a deaf student in one of our team mates school, who used hearing aids in class, yet still struggled to keep up with his studies. This made all of us think and pause about the hardships of students who are deaf or hard-of-hearing, and what problems they face on a daily basis.
 
 To research and enquire more on this, we visited The Bajaj Institute of Learning for the Deaf, Asthal Village, Dehradun. We all interacted with the students there, along with the instructors and met the Principal of the school as well. We attended their classes and events and directly experienced what it meant to be a part of their world. Our questions were asked one by one, and we got more than what we wanted as our answers for validation.
-![These are the Photographs taken by us from our visit at the Bajaj Institute of Learning for the Deaf](BIoLftD1.jpeg,BIoLftD2.jpeg,BIoLftD3.jpeg,BIoLftD4.jpeg)
 
 ---
 
@@ -46,7 +45,6 @@ To research and enquire more on this, we visited The Bajaj Institute of Learning
 We intend to solve this problem by developing an accessible, technology-driven solution that ensures deaf and hard-of-hearing students can understand educational content anytime. The application will convert uploaded videos by the user, either from their Photos gallery or by pasting the YouTube link of the video he wants to watch—into a 3D Avatar translating the spoken content into Indian Sign Language, along with the captions synced with the video.
 
 Unlike existing solutions that are costly, inconsistent, or limited to certain institutions, this approach focuses on affordability, portability, and ease of use. Students will be able to access educational content through a iOS device, specifically for iPhones, ensuring they can follow lessons anytime the user wants. By combining 3D avatar transcription integration and captions as the visual support in one unified system, we aim to create a more inclusive learning environment that enables smooth educational continuity.
-[This is our keynote](docs/Team_S.pdf)
 
 ---
 
